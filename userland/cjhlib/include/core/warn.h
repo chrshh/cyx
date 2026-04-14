@@ -1,0 +1,1 @@
+void warn(char *msg);
