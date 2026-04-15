@@ -1,0 +1,2 @@
+-I../libcjyx/include
+-I../cjhlib/include

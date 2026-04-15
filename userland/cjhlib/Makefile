@@ -1,7 +1,9 @@
+.PHONY: lib tests leet run all clean
+
 CC = gcc
 CFLAGS = -Wall -Wextra -Iinclude
 
-SRC = $(wildcard src/ds/*.c src/core/*.c)
+SRC = $(wildcard src/ds/*.c src/core/*.c src/str/*.c)
 OBJ = $(SRC:.c=.o)
 
 lib: $(OBJ)
@@ -11,6 +13,8 @@ tests: lib
 	$(CC) $(CFLAGS) tests/test_hashmap.c -L. -lmylib -o run_hashmap
 	$(CC) $(CFLAGS) tests/test_array_int.c -L. -lmylib -o run_array_int
 	$(CC) $(CFLAGS) tests/test_linkedlist.c -L. -lmylib -o run_linkedlist
+	$(CC) $(CFLAGS) tests/test_string.c -L. -lmylib -o run_string
+	$(CC) $(CFLAGS) tests/test_strarray.c -L. -lmylib -o run_strarray
 
 # make leet file=leetcode/arrays/two_sum.c
 leet:
@@ -27,6 +31,8 @@ all: lib tests
 	./run_hashmap
 	./run_array_int
 	./run_linkedlist
+	./run_string
+	./run_strarray
 
 clean:
 	rm -f src/ds/*.o src/core/*.o libmylib.a run_*

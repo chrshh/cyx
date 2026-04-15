@@ -22,5 +22,6 @@ HashMap HMResize(HashMap hashmap);
 HashMap HMInsert(HashMap map, int key, int value);
 int *HMGet(HashMap map, int key);
 HashMap HMDelete(HashMap map, int key);
+int HMContains(HashMap map, int key);
 
 int Hash(int key, size_t capacity);
