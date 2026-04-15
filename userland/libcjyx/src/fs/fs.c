@@ -67,3 +67,9 @@ void WriteFile(String path, String in) {
   }
   close(fd);
 }
+
+void ChangeDir(String path) {
+  if (chdir(path.chars) == -1) {
+    panic("failed to change directory");
+  }
+}
