@@ -1,19 +1,43 @@
 #include <builtins.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/syslimits.h>
 #include <unistd.h>
 #include <core/ansi.h>
 #include <fs/fs.h>
 #include <core/panic.h>
 
-int ccd(int argc, char *argv[]) {
-  if (argc > 2) {
-    panic("usage: cd <file>");
+int ccd(char **argv) {
+  String path;
+  if (argv[1] != NULL) {
+    path = StringFromLiteral(argv[1]);
   }
-  String path = StringFromLiteral(argv[1]);
-  if (!path.chars) {
-    path.chars[0] = '.';
-    path.chars[1] = '.';
-    path.chars[3] = '\0';
+  if (path.chars == NULL) {
+    return (0);
   }
   ChangeDir(path);
   return 0;
 }
+
+int cpwd(char **argv) {
+  (void)argv;
+  char buf[PATH_MAX];
+  char *cwd = getcwd(buf, PATH_MAX);
+  String wd;
+  wd = StringFromLiteral(cwd);
+  printf("%s\n", wd.chars);
+  return 0;
+}
+
+int cexit(char **argv) {
+  (void)argv;
+  exit(0);
+}
+
+Builtin builtins[] = {
+    {"cd", ccd},
+    {"pwd", cpwd},
+    {"cexit", cexit},
+};
+size_t builtins_len = sizeof(builtins) / sizeof(builtins[0]);

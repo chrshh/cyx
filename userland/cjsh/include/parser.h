@@ -29,8 +29,8 @@ void destroyParserState(ParserState *psr);
 void parse(ParserState *psr);
 // int match(ParserState *psr);
 
-// void parseStr(ParserState *psr, Command cmd);
-// void parseNum(ParserState *psr);
+void parseStr(ParserState *psr, Command *cmd);
+void parseNum(ParserState *psr, Command *cmd);
 void parseWrd(ParserState *psr, Command *cmd);
 
 #endif

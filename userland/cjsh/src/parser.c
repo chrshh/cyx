@@ -1,3 +1,4 @@
+#include "common.h"
 #include <parser.h>
 #include <core/memory.h>
 #include <core/panic.h>
@@ -21,39 +22,48 @@ void parse(ParserState *psr) {
   if (psr->numTokens < 1) {
     panic("0 tokens");
   }
+
+  /**
+   * Create Space for args[], set main command to the very first token
+   **/
   Command cmd;
   cmd.args = cmalloc((psr->numTokens + 1) * (sizeof(char *)));
+  cmd.cmd = psr->tokens[0].literal;
 
-  Token arg1 = psr->tokens[0];
-  cmd.cmd = arg1.literal;
-  cmd.args[0] = arg1.literal;
-  psr->pos++;
-
-  for (size_t i = 1; i < psr->numTokens; i++) {
-    if (psr->pos >= psr->numTokens) {
+  for (size_t i = 0; i < psr->numTokens; i++) {
+    if (psr->pos > psr->numTokens) {
       break;
     }
     switch (psr->tokens[i].lexeme) {
     case WORD:
       parseWrd(psr, &cmd);
       continue;
-    // case NUMBER:
-    //   parseNum(psr);
-    //   break;
-    // case STRING:
-    //   parseStr(psr, cmd);
-    //   break;
+    case NUMBER:
+      parseNum(psr, &cmd);
+      break;
+    case STRING:
+      parseStr(psr, &cmd);
+      break;
     default:
       printf("command not recognized");
     }
   }
-  cmd.args[psr->pos + 1] = NULL;
+  cmd.args[psr->pos++] = NULL;
 
+  // PrintDebugPSR(psr, &cmd);
   execute(cmd.args[0], cmd.args);
 }
 
 // int match(ParserState *psr) {}
 
 void parseWrd(ParserState *psr, Command *cmd) {
-  cmd->args[psr->pos] = psr->tokens[psr->pos].literal;
+  cmd->args[psr->pos++] = psr->tokens[psr->pos].literal;
+}
+
+void parseStr(ParserState *psr, Command *cmd) {
+  cmd->args[psr->pos++] = psr->tokens[psr->pos].literal;
+}
+
+void parseNum(ParserState *psr, Command *cmd) {
+  cmd->args[psr->pos++] = psr->tokens[psr->pos].literal;
 }

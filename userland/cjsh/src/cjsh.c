@@ -7,6 +7,7 @@
 #include <core/panic.h>
 #include <str/string.h>
 #include <lexer.h>
+#include <string.h>
 
 size_t bufsz = BUFFER_SIZE;
 

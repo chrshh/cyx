@@ -95,6 +95,7 @@ void scanner(LexerState *lxr) {
     lxr->start = lxr->curr;
     scanToken(lxr);
   }
+  // PrintDebugTokensLXR(lxr);
 }
 
 void string(LexerState *lxr) {

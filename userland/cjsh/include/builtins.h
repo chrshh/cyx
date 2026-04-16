@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <stddef.h>
 #include <sys/stat.h>
 
 #ifndef BUILTINS_H
@@ -7,14 +8,18 @@
 #define LS_LONG (1 << 0) // -l
 #define LS_ALL (1 << 1)  // -a
 
-typedef int (*BuildinFn)(char **argv);
+typedef int (*BuiltinFn)(char **argv);
 
 typedef struct {
   char *name;
-  BuildinFn fn;
+  BuiltinFn fn;
 } Builtin;
 
-int ccd(int argc, char *argv[]);
-int ex(int argc, char *argv[]);
+extern Builtin builtins[];
+extern size_t builtins_len;
+
+int ccd(char **argv);
+int cexit(char **argv);
+int cpwd(char **argv);
 
 #endif
