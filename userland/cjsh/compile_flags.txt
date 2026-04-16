@@ -1,0 +1,4 @@
+-Wall
+-Wextra
+-I../cjhlib/include
+-I../libcjyx/include
