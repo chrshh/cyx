@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -I../cjhlib/include -I../libcjyx/include
+CFLAGS = -Wall -Wextra -Iinclude -I../cjhlib/include -I../libcjyx/include
 
 SRC = $(wildcard src/*.c)
 OBJ = $(SRC:.c=.o)

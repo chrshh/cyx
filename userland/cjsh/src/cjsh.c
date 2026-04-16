@@ -1,28 +1,38 @@
-#include <core/ansi.h>
-#include <readline/history.h>
-#include <readline/readline.h>
+#include <parser.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <readline/history.h>
+#include <readline/readline.h>
+#include <core/ansi.h>
+#include <core/panic.h>
+#include <str/string.h>
+#include <lexer.h>
+
+size_t bufsz = BUFFER_SIZE;
 
 int main() {
-  rl_bind_key('\t', rl_complete);
   using_history();
 
-  // REPL LOOP
   while (1) {
+    LexerState lxr = initLexerState(bufsz);
+    if (lxr.source == NULL) {
+      panic("allocation failed");
+    }
 
-    // 1) get line
     char *input = readline(GREEN "~ " RESET);
-    // 2) get tokens gettok()
     if (!input)
       break;
-    add_history(input);
-    //  -> later swap this to lexing->parsing
-
-    printf("fart\n");
-    // 3) Exec
-
-    free(input);
+    if (!(IsEmpty(input))) {
+      add_history(input);
+      lxr.sourceLen = strlen(input);
+      lxr.source = input;
+      scanner(&lxr);
+      ParserState psr = initParserState(lxr.numTokens);
+      psr.tokens = lxr.tokens;
+      parse(&psr);
+      destroyParserState(&psr);
+    }
+    destroyLexerState(&lxr);
   }
   return EXIT_SUCCESS;
 }

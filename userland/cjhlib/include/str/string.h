@@ -30,3 +30,4 @@ int StringContains(String str, char *c);
 int StringIndexOf(String str);
 
 int StringEquals(String str1, String str2);
+int IsEmpty(char *s);

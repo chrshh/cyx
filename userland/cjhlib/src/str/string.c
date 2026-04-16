@@ -111,3 +111,11 @@ String StringSlice(String str, size_t start, size_t end) {
 
   return newStr;
 }
+
+int IsEmpty(char *s) {
+  int i = 0;
+  while (s[i] != '\0') {
+    return 0;
+  }
+  return 1;
+}
