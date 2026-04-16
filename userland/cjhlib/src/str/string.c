@@ -58,7 +58,7 @@ int StringEquals(String str1, String str2) {
   if (str1.len != str2.len) {
     return 0;
   }
-  return strncmp(str1.chars, str2.chars, str1.len) == 0;
+  return strncmp(str1.chars, str2.chars, str1.len) != 0;
 }
 
 int len(String str) { return (strlen(str.chars)); }

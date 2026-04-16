@@ -1,10 +1,21 @@
+#include <core/ansi.h>
 #include <core/memory.h>
 #include <core/panic.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <fs/fs.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+/* read write execute
+ [ownner][group][others]
+   rwx     rwx    rwx
+*/
+// static char rwx[3] = "rwx"; // 7
+// static char r_x[3] = "r-x"; // 6
+// static char r__[3] = "r--"; // 5
 
 int FileExists(String path) {
   struct stat sb;
@@ -72,4 +83,42 @@ void ChangeDir(String path) {
   if (chdir(path.chars) == -1) {
     panic("failed to change directory");
   }
+}
+
+DIR *OpenDir(char *path) {
+  DIR *dirp = opendir(path);
+  if (dirp == NULL) {
+    perror("failed to open dir");
+    panic("failed to open dir");
+  }
+  return dirp;
+}
+
+// Takes octal val (sb.st_mode & 0777) and formats
+String FormatPermsOctal(int perm) {
+  String permstr = NewString();
+  char str[4];
+
+  sprintf(str, "%o", perm);
+  for (int i = 0; i < 3; i++) {
+    switch (str[i]) {
+    case '7':
+      permstr = StringAppend(permstr, "rwx");
+      break;
+    case '6':
+      permstr = StringAppend(permstr, "rw-");
+      break;
+    case '5':
+      permstr = StringAppend(permstr, "r-x");
+      break;
+    case '4':
+      permstr = StringAppend(permstr, "r--");
+      break;
+    default:
+      permstr = StringAppend(permstr, "---");
+      break;
+    }
+  }
+  permstr = StringAppend(permstr, "@");
+  return permstr;
 }

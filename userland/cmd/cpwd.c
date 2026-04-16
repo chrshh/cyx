@@ -1,6 +1,6 @@
 #include <core/panic.h>
 #include <fs/fs.h>
-#include <linux/limits.h>
+#include <limits.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -9,6 +9,6 @@ int main() {
   char *cwd = getcwd(buf, PATH_MAX);
   String wd;
   wd = StringFromLiteral(cwd);
-  printf("%s", wd.chars);
+  printf("%s\n", wd.chars);
   return 0;
 }
