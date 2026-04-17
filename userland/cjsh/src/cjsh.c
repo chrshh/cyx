@@ -8,16 +8,27 @@
 #include <str/string.h>
 #include <lexer.h>
 #include <string.h>
+#include <signals.h>
+#include <signal.h>
+#include <setjmp.h>
 
+sigjmp_buf prompt_jmp;
 size_t bufsz = BUFFER_SIZE;
 
 int main() {
+  signal(SIGINT, fatal_error_signal);
   using_history();
 
   while (1) {
     LexerState lxr = initLexerState(bufsz);
     if (lxr.source == NULL) {
       panic("allocation failed");
+    }
+
+    if (sigsetjmp(prompt_jmp, 1)) {
+      // crtl c jumped here, immediately clean up and reset
+      destroyLexerState(&lxr);
+      continue;
     }
 
     char *input = readline(GREEN "~ " RESET);

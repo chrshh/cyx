@@ -45,7 +45,7 @@ void freeTokens(LexerState *lxr);
 void scanner(LexerState *lxr);
 char advance(LexerState *lxr);
 char peek(LexerState *lxr);
-char peekNext(LexerState *lxr);
+char peekNextChar(LexerState *lxr);
 void scanToken(LexerState *lxr);
 
 void addToken(LexerState *lxr, Lexeme type, char *literal, double val);

@@ -4,6 +4,8 @@
 #include <core/panic.h>
 #include <stdio.h>
 #include <exec.h>
+#include <stdlib.h>
+#include <string.h>
 
 ParserState initParserState(size_t numTokens) {
   ParserState psr;
@@ -26,44 +28,89 @@ void parse(ParserState *psr) {
   /**
    * Create Space for args[], set main command to the very first token
    **/
-  Command cmd;
-  cmd.args = cmalloc((psr->numTokens + 1) * (sizeof(char *)));
-  cmd.cmd = psr->tokens[0].literal;
+  Command *cmd = cmalloc(sizeof(Command));
+  cmd->args = cmalloc((psr->numTokens + 1) * (sizeof(char *)));
+  memset(cmd->args, 0, (psr->numTokens + 1) * sizeof(char *));
+  cmd->cmd = psr->tokens[0].literal;
+  cmd->args[0] = psr->tokens[0].literal;
+  psr->pos = 1;
+  cmd->numArgs = 1;
+  Command *head = cmd;
 
-  for (size_t i = 0; i < psr->numTokens; i++) {
+  while (psr->pos < psr->numTokens) {
     if (psr->pos > psr->numTokens) {
-      break;
+      return;
     }
-    switch (psr->tokens[i].lexeme) {
+    switch (psr->tokens[psr->pos].lexeme) {
     case WORD:
-      parseWrd(psr, &cmd);
-      continue;
+      cmd = parseWrd(psr, cmd);
+      break;
     case NUMBER:
-      parseNum(psr, &cmd);
+      cmd = parseNum(psr, cmd);
       break;
     case STRING:
-      parseStr(psr, &cmd);
+      cmd = parseStr(psr, cmd);
+      break;
+    case PIPE:
+      cmd = parsePipe(psr, cmd);
       break;
     default:
-      printf("command not recognized");
+      printf("command not recognized\n");
+      break;
     }
   }
-  cmd.args[psr->pos++] = NULL;
+  cmd->args[cmd->numArgs] = NULL;
 
-  // PrintDebugPSR(psr, &cmd);
-  execute(cmd.args[0], cmd.args);
+  // PrintDebugPSR(head);
+  execute(head);
 }
 
 // int match(ParserState *psr) {}
 
-void parseWrd(ParserState *psr, Command *cmd) {
-  cmd->args[psr->pos++] = psr->tokens[psr->pos].literal;
+Token *peekNextToken(ParserState *psr) {
+  if (psr->pos + 1 >= psr->numTokens) {
+    return NULL;
+  }
+  return &psr->tokens[psr->pos + 1];
 }
 
-void parseStr(ParserState *psr, Command *cmd) {
-  cmd->args[psr->pos++] = psr->tokens[psr->pos].literal;
+Command *parseWrd(ParserState *psr, Command *cmd) {
+  cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
+  cmd->numArgs++;
+  psr->pos++;
+  return cmd;
 }
 
-void parseNum(ParserState *psr, Command *cmd) {
-  cmd->args[psr->pos++] = psr->tokens[psr->pos].literal;
+Command *parseStr(ParserState *psr, Command *cmd) {
+  cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
+  psr->pos++;
+  cmd->numArgs++;
+  return cmd;
+}
+
+Command *parseNum(ParserState *psr, Command *cmd) {
+  cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
+  psr->pos++;
+  cmd->numArgs++;
+  return cmd;
+}
+
+Command *parsePipe(ParserState *psr, Command *cmd) {
+  Token *nxtToken = peekNextToken(psr);
+  if (nxtToken == NULL) {
+    printf("cjsh: broken pipe");
+    exit(1);
+  }
+  cmd->args[cmd->numArgs] = NULL;
+  Command *newCmd = cmalloc(sizeof(Command));
+  newCmd->args = cmalloc((psr->numTokens + 1) * (sizeof(char *)));
+  memset(newCmd->args, 0, (psr->numTokens + 1) * sizeof(char *));
+  newCmd->cmd = nxtToken->literal;
+  newCmd->args[0] = nxtToken->literal;
+  newCmd->numArgs = 1;
+  newCmd->next = NULL;
+  cmd->next = newCmd;
+  psr->pos++;
+  psr->pos++;
+  return newCmd;
 }

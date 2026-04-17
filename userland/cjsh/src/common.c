@@ -16,16 +16,15 @@ void PrintDebugTokensLXR(LexerState *lxr) {
   }
 }
 
-void PrintDebugPSR(ParserState *psr, Command *cmd) {
-  printf("--- PSR --- \nNUM_TOKENS=%zu\n", psr->numTokens);
-  Token *tokens = psr->tokens;
-  for (size_t i = 0; i < psr->numTokens; i++) {
-    printf("Token %zu: %s\n\n", i + 1, tokens[i].literal);
-  }
-
+void PrintDebugPSR(Command *head) {
   printf("--- PSR CMD ---\n");
-  printf("ARG[0]: %s\n", cmd->cmd);
-  for (size_t i = 0; i < cmd->numArgs; i++) {
-    printf("ARG[%zu]: %s\n\n", i, cmd->args[i]);
+  int cmdIdx = 0;
+  while (head != NULL) {
+    printf("CMD %d: %s\n", cmdIdx, head->cmd);
+    for (size_t i = 0; i < head->numArgs; i++) {
+      printf("  ARG[%zu]: %s\n", i, head->args[i]);
+    }
+    head = head->next;
+    cmdIdx++;
   }
 }

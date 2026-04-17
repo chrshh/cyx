@@ -8,6 +8,6 @@
 int isAlphaNum(char c);
 int isShChar(char c);
 void PrintDebugTokensLXR(LexerState *lxr);
-void PrintDebugPSR(ParserState *psr, Command *cmd);
+void PrintDebugPSR(Command *cmd);
 
 #endif

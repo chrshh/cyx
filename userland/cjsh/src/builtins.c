@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/syslimits.h>
+#include <limits.h>
 #include <unistd.h>
 #include <core/ansi.h>
 #include <fs/fs.h>
@@ -32,7 +32,12 @@ int cpwd(char **argv) {
 
 int cexit(char **argv) {
   (void)argv;
-  exit(0);
+  if (getpid() == 1) {
+    printf("cjsh: cannot exit PID 1");
+    return 0;
+  } else {
+    exit(0);
+  }
 }
 
 Builtin builtins[] = {

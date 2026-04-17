@@ -1,5 +1,5 @@
-#ifndef CJSH_PARSE_H_
-#define CJSH_PARSE_H_
+#ifndef CJSH_PARSE_H
+#define CJSH_PARSE_H
 
 #include "lexer.h"
 #include <stddef.h>
@@ -28,9 +28,11 @@ void destroyParserState(ParserState *psr);
 
 void parse(ParserState *psr);
 // int match(ParserState *psr);
+Token *peekNext(ParserState *psr);
 
-void parseStr(ParserState *psr, Command *cmd);
-void parseNum(ParserState *psr, Command *cmd);
-void parseWrd(ParserState *psr, Command *cmd);
+Command *parseStr(ParserState *psr, Command *cmd);
+Command *parseNum(ParserState *psr, Command *cmd);
+Command *parseWrd(ParserState *psr, Command *cmd);
+Command *parsePipe(ParserState *psr, Command *cmd);
 
 #endif

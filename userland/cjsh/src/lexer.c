@@ -55,7 +55,7 @@ char peek(LexerState *lxr) {
   return lxr->source[lxr->curr];
 }
 
-char peekNext(LexerState *lxr) {
+char peekNextChar(LexerState *lxr) {
   if (lxr->curr + 1 >= lxr->sourceLen) {
     return '\0';
   }
@@ -203,7 +203,7 @@ void scanToken(LexerState *lxr) {
     addToken(lxr, CLOSE_PARENS, NULL, 0);
     break;
   case '|':
-    addToken(lxr, PIPE, NULL, 0);
+    addToken(lxr, PIPE, "|", 0);
     break;
   case '\\':
     addToken(lxr, BACKSLASH, NULL, 0);
@@ -238,7 +238,7 @@ const char *lexemeToString(Lexeme type) {
   case STRING:
     return "STRING";
   case PIPE:
-    return "PIPE";
+    return "|";
   case LESS:
     return "<";
   case GREATER:
