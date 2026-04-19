@@ -6,7 +6,7 @@ CJHLIB    = ../cjhlib
 LIBCJYX   = ../libcjyx
 
 CFLAGS  = -Wall -Wextra -I$(CJHLIB)/include -I$(LIBCJYX)/include
-LDFLAGS = -L$(CJHLIB) -lmylib -L$(LIBCJYX) -lcjyx
+LDFLAGS = -L$(LIBCJYX) -L$(CJHLIB) -lcjyx -lmylib
 
 SRCS = $(wildcard *.c)
 BINS = $(patsubst %.c, bin/%, $(SRCS))

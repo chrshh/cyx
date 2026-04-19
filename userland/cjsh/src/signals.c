@@ -10,7 +10,7 @@ void fatal_error_signal(int sig) {
     kill(curr_ch_pid, sig);
   } else {
     // No child running, reset prompt
-    write(STDOUT_FILENO, "\n", 1);
+    write(STDOUT_FILENO, "\r", 1);
     siglongjmp(prompt_jmp, 1);
   }
 }

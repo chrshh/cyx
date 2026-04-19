@@ -35,4 +35,4 @@ all: lib tests
 	./run_strarray
 
 clean:
-	rm -f src/ds/*.o src/core/*.o libmylib.a run_*
+	rm -f src/ds/*.o src/core/*.o src/str/*.o libmylib.a run_*

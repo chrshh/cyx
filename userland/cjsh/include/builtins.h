@@ -18,8 +18,11 @@ typedef struct {
 extern Builtin builtins[];
 extern size_t builtins_len;
 
-int ccd(char **argv);
-int cexit(char **argv);
-int cpwd(char **argv);
+int cd(char **argv);
+int ext(char **argv);
+int expt(char **argv);
+int pwd(char **argv);
+
+int geten(char **argv);
 
 #endif

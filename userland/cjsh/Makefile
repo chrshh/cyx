@@ -8,7 +8,7 @@ CJHLIB = ../cjhlib
 LIBCJYX = ../libcjyx
 
 cjsh: $(CJHLIB)/libmylib.a $(LIBCJYX)/libcjyx.a $(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) -L$(LIBCJYX) -lcjyx -L$(CJHLIB) -lmylib -lreadline -o cjsh
+	$(CC) $(CFLAGS) $(OBJ) -L$(LIBCJYX) -L$(CJHLIB) -lcjyx -lmylib -lreadline -o cjsh
 
 $(CJHLIB)/libmylib.a:
 	$(MAKE) -C $(CJHLIB) lib

@@ -107,7 +107,8 @@ void string(LexerState *lxr) {
   }
 
   if (isEnd(lxr)) {
-    panic("unterminated string");
+    PrintShWarning("unterminated string");
+    return;
   }
 
   advance(lxr);
@@ -196,6 +197,12 @@ void scanToken(LexerState *lxr) {
   case ';':
     addToken(lxr, SEMICOLON, NULL, 0);
     break;
+  case '$':
+    addToken(lxr, DOLLAR, "$", 0);
+    break;
+  case '=':
+    addToken(lxr, EQUALS, "=", 0);
+    break;
   case '(':
     addToken(lxr, OPEN_PARENS, NULL, 0);
     break;
@@ -210,6 +217,7 @@ void scanToken(LexerState *lxr) {
     break;
   case '/':
     addToken(lxr, FORWARD_SLASH, NULL, 0);
+    break;
   case ' ':
   case '\r':
   case '\t':
@@ -226,7 +234,8 @@ void scanToken(LexerState *lxr) {
     } else if (isAlphaNum(c) || isShChar(c)) {
       word(lxr);
     } else {
-      panic("unknown command");
+      printf("unknown command\n");
+      break;
     }
   }
 }
@@ -254,6 +263,10 @@ const char *lexemeToString(Lexeme type) {
     break;
   case BACKSLASH:
     return "\\";
+  case DOLLAR:
+    return "$";
+  case EQUALS:
+    return "=";
   default:
     return "UNKNOWN";
   }

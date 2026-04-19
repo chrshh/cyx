@@ -18,6 +18,8 @@ typedef enum {
   BACKSLASH,
   FORWARD_SLASH,
   PIPE,
+  DOLLAR,
+  EQUALS,
   WORD
 } Lexeme;
 

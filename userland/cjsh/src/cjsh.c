@@ -1,3 +1,4 @@
+#include "common.h"
 #include <parser.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,7 +6,6 @@
 #include <readline/readline.h>
 #include <core/ansi.h>
 #include <core/panic.h>
-#include <str/string.h>
 #include <lexer.h>
 #include <string.h>
 #include <signals.h>
@@ -18,6 +18,7 @@ size_t bufsz = BUFFER_SIZE;
 int main() {
   signal(SIGINT, fatal_error_signal);
   using_history();
+  setenv("PATH", "usr/bin/", 0);
 
   while (1) {
     LexerState lxr = initLexerState(bufsz);
@@ -31,7 +32,10 @@ int main() {
       continue;
     }
 
-    char *input = readline(GREEN "~ " RESET);
+    String shPrompt = GetShPrompt();
+
+    printf(CYAN "%s " RESET, shPrompt.chars);
+    char *input = readline(RED "~ " RESET);
     if (!input)
       break;
     if (!(IsEmpty(input))) {
@@ -45,6 +49,7 @@ int main() {
       destroyParserState(&psr);
     }
     destroyLexerState(&lxr);
+    FreeShPrompt(shPrompt);
   }
   return EXIT_SUCCESS;
 }

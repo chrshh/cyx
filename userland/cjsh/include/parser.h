@@ -11,6 +11,7 @@ struct Command {
   char **args;
   size_t numArgs;
   Command *next; // for pipes
+  int isEnv;     // for env vars
   char *outFile;
   char *inFile;
   char *appendFile;
@@ -27,12 +28,12 @@ ParserState initParserState(size_t numTokens);
 void destroyParserState(ParserState *psr);
 
 void parse(ParserState *psr);
-// int match(ParserState *psr);
 Token *peekNext(ParserState *psr);
 
 Command *parseStr(ParserState *psr, Command *cmd);
 Command *parseNum(ParserState *psr, Command *cmd);
 Command *parseWrd(ParserState *psr, Command *cmd);
 Command *parsePipe(ParserState *psr, Command *cmd);
+Command *parseEq(ParserState *psr, Command *cmd);
 
 #endif

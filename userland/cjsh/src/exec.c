@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/_types/_pid_t.h>
 #include <unistd.h>
 #include <core/panic.h>
 #include <sys/wait.h>
@@ -21,7 +20,7 @@ int execute(Command *cmd) {
   int pid_count = 0;
 
   // SINGLE CMD
-  if (cmd->next == NULL) {
+  if (cmd->next == NULL && cmd->isEnv != 1) {
     // Check Built in first
     for (size_t i = 0; i < builtins_len; i++) {
       if (strcmp(builtins[i].name, cmd->args[0]) == 0) {
@@ -45,6 +44,12 @@ int execute(Command *cmd) {
     }
     return 0;
   }
+
+  // Handle ENV assignments
+  if (cmd->next == NULL && cmd->isEnv == 1) {
+    return expt(cmd->args);
+  }
+
   // PIPE CHAIN
   while (cmd != NULL) {
     if (cmd->next != NULL) {

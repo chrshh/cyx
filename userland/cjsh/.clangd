@@ -1,0 +1,7 @@
+CompileFlags:
+  Add: 
+    - -Wall
+    - -Wextra
+    - -Iinclude
+    - -I../cjhlib/include
+    - -I../libcjyx/include

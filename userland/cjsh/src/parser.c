@@ -1,4 +1,3 @@
-#include "common.h"
 #include <parser.h>
 #include <core/memory.h>
 #include <core/panic.h>
@@ -29,6 +28,7 @@ void parse(ParserState *psr) {
    * Create Space for args[], set main command to the very first token
    **/
   Command *cmd = cmalloc(sizeof(Command));
+  memset(cmd, 0, sizeof(Command));
   cmd->args = cmalloc((psr->numTokens + 1) * (sizeof(char *)));
   memset(cmd->args, 0, (psr->numTokens + 1) * sizeof(char *));
   cmd->cmd = psr->tokens[0].literal;
@@ -53,6 +53,9 @@ void parse(ParserState *psr) {
       break;
     case PIPE:
       cmd = parsePipe(psr, cmd);
+      break;
+    case EQUALS:
+      cmd = parseEq(psr, cmd);
       break;
     default:
       printf("command not recognized\n");
@@ -90,6 +93,21 @@ Command *parseStr(ParserState *psr, Command *cmd) {
 
 Command *parseNum(ParserState *psr, Command *cmd) {
   cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
+  psr->pos++;
+  cmd->numArgs++;
+  return cmd;
+}
+
+Command *parseEq(ParserState *psr, Command *cmd) {
+  Token *nxtToken = peekNextToken(psr);
+  if (nxtToken == NULL) {
+    printf("cjsh: missing assignment");
+    exit(1);
+  }
+
+  cmd->isEnv = 1;
+  psr->pos++;
+  cmd->args[cmd->numArgs] = nxtToken->literal;
   psr->pos++;
   cmd->numArgs++;
   return cmd;
