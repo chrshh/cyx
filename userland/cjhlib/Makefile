@@ -1,7 +1,7 @@
 .PHONY: lib tests leet run all clean
 
 CC = gcc
-CFLAGS = -Wall -Wextra -Iinclude
+CFLAGS = -Wall -Wextra -Wpedantic -Wformat=2 -Wconversion -Wstrict-prototypes -Wmissing-prototypes -Wnull-dereference -O2 -Iinclude $(EXTRA_FLAGS)
 
 SRC = $(wildcard src/ds/*.c src/core/*.c src/str/*.c)
 OBJ = $(SRC:.c=.o)

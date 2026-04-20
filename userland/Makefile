@@ -1,4 +1,6 @@
-.PHONY: all clean cjhlib libcjyx cjsh utils rebuild
+.PHONY: all clean cjhlib libcjyx cjsh utils rebuild rn
+
+IMAGE = cjyx
 
 all: cjhlib libcjyx cjsh utils
 
@@ -15,6 +17,14 @@ utils: libcjyx
 	$(MAKE) -C cmd all
 
 rebuild: clean all
+
+rn:
+	docker build -t $(IMAGE) .
+	docker run -it --rm $(IMAGE)
+
+dbg:
+	docker build -t $(IMAGE)-dbg --build-arg EXTRA_FLAGS="-g -O0" .
+	docker run -it --rm $(IMAGE)-dbg /bin/bash
 
 clean:
 	$(MAKE) -C cjhlib clean

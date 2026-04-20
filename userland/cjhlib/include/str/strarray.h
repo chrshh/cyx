@@ -7,7 +7,7 @@ typedef struct {
   size_t capacity;
 } StrArr;
 
-StrArr NewStrArr();
+StrArr NewStrArr(void);
 void FreeStrArr(StrArr strarr);
 
 /**

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Iinclude -I../cjhlib/include
+CFLAGS = -Wall -Wextra -Wpedantic -Wformat=2 -Wconversion -Wstrict-prototypes -Wmissing-prototypes -Wnull-dereference -O2 -Iinclude -I../cjhlib/include $(EXTRA_FLAGS)
 
 SRC = $(wildcard src/**/*.c src/*.c)
 OBJ = $(SRC:.c=.o)

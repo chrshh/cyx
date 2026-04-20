@@ -35,5 +35,8 @@ Command *parseNum(ParserState *psr, Command *cmd);
 Command *parseWrd(ParserState *psr, Command *cmd);
 Command *parsePipe(ParserState *psr, Command *cmd);
 Command *parseEq(ParserState *psr, Command *cmd);
+Command *parseVar(ParserState *psr, Command *cmd);
+char *expandVar(char *rawval);
+char *concatVar(char *rawval, char *expandedVar);
 
 #endif

@@ -44,7 +44,7 @@ int expt(char **argv) {
   if (!key || !val) {
     return -1;
   }
-  int success = setenv(key, val, 0);
+  int success = setenv(key, val, 1);
   if (success != 0) {
     printf("failed to set env");
     return -1;
@@ -63,18 +63,38 @@ int ext(char **argv) {
   }
 }
 
-int geten(char **argv) {
+int rstenv(char **argv) {
+  (void)argv;
+  char *default_path = "/cjyx/cmd/bin:/usr/local/sbin:/usr/local/bin:/usr/"
+                       "sbin:/usr/bin:/sbin:/bin";
+  int res = setenv("PATH", default_path, 1);
+  if (res != 0) {
+    printf("cjsh: cannot reset PATH\n");
+    return res;
+  }
+  return 0;
+}
+
+int prntenv(char **argv) {
   char *env = argv[1];
   char *res = getenv(env);
-  if (*res == -1) {
-    res = "NOT FOUND";
+  if (res == NULL) {
+    printf("cjsh: env variable not found\n");
     return -1;
   }
   printf("ENV: %s\n", res);
   return 0;
 }
 
-Builtin builtins[] = {
-    {"cd", cd}, {"pwd", pwd}, {"expt", expt}, {"ext", ext}, {"env", geten},
-};
+int bi(char **argv) {
+  (void)argv;
+  for (size_t i = 0; i < builtins_len; i++) {
+    printf("%s\n", builtins[i].name);
+  }
+  return 0;
+}
+
+Builtin builtins[] = {{"cd", cd},   {"pwd", pwd},         {"expt", expt},
+                      {"ext", ext}, {"prntenv", prntenv}, {"rstenv", rstenv},
+                      {"bi", bi}};
 size_t builtins_len = sizeof(builtins) / sizeof(builtins[0]);

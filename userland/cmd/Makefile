@@ -5,7 +5,7 @@ CC = gcc
 CJHLIB    = ../cjhlib
 LIBCJYX   = ../libcjyx
 
-CFLAGS  = -Wall -Wextra -I$(CJHLIB)/include -I$(LIBCJYX)/include
+CFLAGS  = -Wall -Wextra -Wpedantic -Wformat=2 -Wconversion -Wstrict-prototypes -Wmissing-prototypes -Wnull-dereference -O2 -I$(CJHLIB)/include -I$(LIBCJYX)/include $(EXTRA_FLAGS)
 LDFLAGS = -L$(LIBCJYX) -L$(CJHLIB) -lcjyx -lmylib
 
 SRCS = $(wildcard *.c)

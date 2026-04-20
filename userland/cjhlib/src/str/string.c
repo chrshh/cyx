@@ -54,6 +54,18 @@ String StringAppend(String str, char *c) {
   return newStr;
 }
 
+// NON NULL TERMINATED
+String StringAppendStr(String str1, String str2) {
+  size_t strlength = len(str1) + len(str2);
+  String newStr = NewString();
+  newStr.len = strlength;
+  newStr.capacity = strlength;
+  newStr.chars = cmalloc(strlength + 1);
+  memcpy(newStr.chars, str1.chars, str1.len);
+  memcpy(newStr.chars + str1.len, str2.chars, str2.len);
+  return newStr;
+}
+
 int StringEquals(String str1, String str2) {
   if (str1.len != str2.len) {
     return 0;

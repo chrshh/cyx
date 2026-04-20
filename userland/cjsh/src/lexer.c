@@ -203,12 +203,6 @@ void scanToken(LexerState *lxr) {
   case '=':
     addToken(lxr, EQUALS, "=", 0);
     break;
-  case '(':
-    addToken(lxr, OPEN_PARENS, NULL, 0);
-    break;
-  case ')':
-    addToken(lxr, CLOSE_PARENS, NULL, 0);
-    break;
   case '|':
     addToken(lxr, PIPE, "|", 0);
     break;
@@ -216,7 +210,8 @@ void scanToken(LexerState *lxr) {
     addToken(lxr, BACKSLASH, NULL, 0);
     break;
   case '/':
-    addToken(lxr, FORWARD_SLASH, NULL, 0);
+    break;
+  case ':':
     break;
   case ' ':
   case '\r':
@@ -254,13 +249,6 @@ const char *lexemeToString(Lexeme type) {
     return ">";
   case GREATERGREATER:
     return ">>";
-  case OPEN_PARENS:
-    return "(";
-  case CLOSE_PARENS:
-    return ")";
-  case FORWARD_SLASH:
-    return "/";
-    break;
   case BACKSLASH:
     return "\\";
   case DOLLAR:

@@ -17,11 +17,12 @@ typedef struct {
  *  - Dont check for '\0' in loops, let the bounds check handle that
  **/
 
-String NewString();
+String NewString(void);
 void FreeString(String str);
 String StringResize(String str);
 
 String StringAppend(String str, char *c);
+String StringAppendStr(String str1, String str2);
 String StringCopy(String str);
 String StringFromLiteral(char *c);
 String StringPop(String str);
@@ -33,3 +34,4 @@ int StringIndexOf(String str);
 
 int StringEquals(String str1, String str2);
 int IsEmpty(char *s);
+int len(String str);

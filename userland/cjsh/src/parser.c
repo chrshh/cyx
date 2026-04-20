@@ -1,3 +1,5 @@
+#include "common.h"
+#include <str/string.h>
 #include <parser.h>
 #include <core/memory.h>
 #include <core/panic.h>
@@ -5,6 +7,7 @@
 #include <exec.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 ParserState initParserState(size_t numTokens) {
   ParserState psr;
@@ -57,6 +60,8 @@ void parse(ParserState *psr) {
     case EQUALS:
       cmd = parseEq(psr, cmd);
       break;
+    case DOLLAR:
+      cmd = parseVar(psr, cmd);
     default:
       printf("command not recognized\n");
       break;
@@ -64,7 +69,7 @@ void parse(ParserState *psr) {
   }
   cmd->args[cmd->numArgs] = NULL;
 
-  // PrintDebugPSR(head);
+  PrintDebugPSR(head);
   execute(head);
 }
 
@@ -104,14 +109,27 @@ Command *parseEq(ParserState *psr, Command *cmd) {
     printf("cjsh: missing assignment");
     exit(1);
   }
-
   cmd->isEnv = 1;
-  psr->pos++;
-  cmd->args[cmd->numArgs] = nxtToken->literal;
-  psr->pos++;
-  cmd->numArgs++;
-  return cmd;
+
+  // If we run into key=$val:
+  // - increment pos from '=' to '$' to <val>
+  if (strcmp(nxtToken->literal, "$") == 0) {
+    psr->pos++;
+    psr->pos++;
+    return parseVar(psr, cmd);
+  } else {
+    psr->pos++;
+    cmd->args[cmd->numArgs] = nxtToken->literal;
+    psr->pos++;
+    cmd->numArgs++;
+    return cmd;
+  }
 }
+
+Command *parseVar(ParserState *psr, Command *cmd) {}
+
+// Returns fully expanded
+char *expandVar(char *rawval) {}
 
 Command *parsePipe(ParserState *psr, Command *cmd) {
   Token *nxtToken = peekNextToken(psr);

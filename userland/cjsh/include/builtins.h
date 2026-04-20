@@ -22,7 +22,16 @@ int cd(char **argv);
 int ext(char **argv);
 int expt(char **argv);
 int pwd(char **argv);
+int bi(char **argv);
 
-int geten(char **argv);
+/**
+ * @brief Debug cmd to view variables set
+ */
+int prntenv(char **argv);
+
+/**
+ *  @brief Reset PATH if I make an oopsie
+ */
+int rstenv(char **argv);
 
 #endif

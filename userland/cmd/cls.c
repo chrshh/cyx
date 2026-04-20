@@ -1,17 +1,8 @@
 #include <core/ansi.h>
-#include <dirent.h>
 #include <fs/fs.h>
 #include <stdio.h>
-#include <sys/stat.h>
 #include <unistd.h>
-
-#ifndef LS_H
-#define LS_H
-
-#define LS_LONG (1 << 0) // -l
-#define LS_ALL (1 << 1)  // -a
-
-#endif
+#include "ls.h"
 
 int ParseFlags(int argc, char *argv[]) {
   int flags = 0;
