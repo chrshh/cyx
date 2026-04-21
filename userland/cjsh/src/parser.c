@@ -1,4 +1,3 @@
-#include "common.h"
 #include <str/string.h>
 #include <parser.h>
 #include <core/memory.h>
@@ -62,6 +61,7 @@ void parse(ParserState *psr) {
       break;
     case DOLLAR:
       cmd = parseVar(psr, cmd);
+      break;
     default:
       printf("command not recognized\n");
       break;
@@ -69,7 +69,7 @@ void parse(ParserState *psr) {
   }
   cmd->args[cmd->numArgs] = NULL;
 
-  PrintDebugPSR(head);
+  // PrintDebugPSR(head);
   execute(head);
 }
 
@@ -113,23 +113,39 @@ Command *parseEq(ParserState *psr, Command *cmd) {
 
   // If we run into key=$val:
   // - increment pos from '=' to '$' to <val>
-  if (strcmp(nxtToken->literal, "$") == 0) {
-    psr->pos++;
-    psr->pos++;
-    return parseVar(psr, cmd);
-  } else {
-    psr->pos++;
-    cmd->args[cmd->numArgs] = nxtToken->literal;
-    psr->pos++;
-    cmd->numArgs++;
-    return cmd;
-  }
+  // if (strcmp(nxtToken->literal, "$") == 0) {
+  //   psr->pos++;
+  //   psr->pos++;
+  //   return parseVar(psr, cmd);
+  // } else {
+  psr->pos++;
+  cmd->args[cmd->numArgs] = nxtToken->literal;
+  psr->pos++;
+  cmd->numArgs++;
+  return cmd;
 }
 
-Command *parseVar(ParserState *psr, Command *cmd) {}
+Command *parseVar(ParserState *psr, Command *cmd) {
+  psr->pos++;
+  char *var = psr->tokens[psr->pos].literal;
+  var = expandVar(var);
+  if (var == NULL) {
+    printf("cjsh: NO ENV FOUND");
+  }
+  cmd->args[cmd->numArgs] = var;
+  psr->pos++;
+  cmd->numArgs++;
+  return cmd;
+}
 
 // Returns fully expanded
-char *expandVar(char *rawval) {}
+char *expandVar(char *var) {
+  char *res = getenv(var);
+  if (res == NULL) {
+    return NULL;
+  }
+  return res;
+}
 
 Command *parsePipe(ParserState *psr, Command *cmd) {
   Token *nxtToken = peekNextToken(psr);
