@@ -2,15 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
-#define ASSERT(condition, msg)                                                 \
-  if (condition) {                                                             \
-    printf("PASS✅: %s\n", msg);                                               \
-  } else {                                                                     \
-    printf("FAIL❌: %s\n", msg);                                               \
+#define ASSERT(condition, msg)   \
+  if (condition) {               \
+    printf("PASS✅: %s\n", msg); \
+  } else {                       \
+    printf("FAIL❌: %s\n", msg); \
   }
 
-int main() {
+int main(void) {
   printf("=== HashMap Tests ===\n\n");
 
   // --- CreateHashMap ---

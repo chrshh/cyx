@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 // Default allocation of 64 for decent spacing out amongst ints
-HashMap CreateHashMap() {
+HashMap CreateHashMap(void) {
   HashMap hashmap;
   hashmap.buckets = cmalloc(64 * sizeof(HashNode *));
   hashmap.capacity = 64;
@@ -12,7 +12,7 @@ HashMap CreateHashMap() {
   return hashmap;
 }
 
-HashMap CreateHashMap128() {
+HashMap CreateHashMap128(void) {
   HashMap hashmap;
   hashmap.buckets = cmalloc(128 * sizeof(HashNode *));
   hashmap.capacity = 128;
@@ -21,7 +21,7 @@ HashMap CreateHashMap128() {
   return hashmap;
 }
 
-HashMap CreateHashMap256() {
+HashMap CreateHashMap256(void) {
   HashMap hashmap;
   hashmap.buckets = cmalloc(256 * sizeof(HashNode *));
   hashmap.capacity = 256;

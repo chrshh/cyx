@@ -1,28 +1,38 @@
+#include "core/types.h"
+#include <stdbool.h>
 #include <stddef.h>
+
+#define INIT_CAPACITY 8
 
 // must maintain capacity >= length !!
 typedef struct {
   int *data;
-  size_t length;
-  size_t capacity;
+  usize len;
+  usize capacity;
 } IntArr;
 
 // Initialization
-IntArr CreateIntArr();
-IntArr CreateIntArrFromData(int *data, size_t length);
-IntArr CreateIntArrWithCapacity(size_t capacity);
+IntArr NewIntArr(void);
+IntArr NewIntArrFromData(int *data, usize length);
+IntArr NewIntArrWithCapacity(usize capacity);
+void FreeIntArr(IntArr *arr);
 
-IntArr IAAppend(IntArr arr, int value);
-IntArr IAResize(IntArr arr);
-IntArr IAInsert(IntArr arr, size_t index, int value);
-IntArr IADelete(IntArr arr, size_t index);
+void IntArrAppend(IntArr *arr, int value);
+IntArr IntArrResize(IntArr arr);
+void IntArrInsert(IntArr *arr, usize index, int value);
+void IntArrDelete(IntArr *arr, usize index);
 
-int IAGet(IntArr arr, int index);
-IntArr IASet(IntArr arr, int index, int value);
-IntArr IAPop(IntArr arr);
+int IntArrGet(IntArr *arr, usize index);
+void IntArrSet(IntArr *arr, usize index, int value);
+void IntArrPop(IntArr *arr);
 
-int IAPeek(IntArr arr);
-int IASearch(IntArr arr, int value);
+int IntArrPeek(const IntArr *arr);
+bool IntArrSearch(const IntArr *arr, int value);
 
-size_t IAGetCapacity(IntArr arr);
-size_t IAGetLen(IntArr arr);
+usize IntArrGetCapacity(IntArr *arr);
+usize IntArrGetLen(IntArr *arr);
+
+IntArr IntArrSlice(IntArr, usize start, usize end);
+IntArr IntArrCpy(IntArr arr);
+IntArr IntArrConcat(IntArr arr1, IntArr arr2);
+void IntArrClr(IntArr *arr);

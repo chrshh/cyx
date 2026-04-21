@@ -13,9 +13,9 @@ typedef struct {
   size_t size;
 } HashMap;
 
-HashMap CreateHashMap();
-HashMap CreateHashMap128();
-HashMap CreateHashMap256();
+HashMap CreateHashMap(void);
+HashMap CreateHashMap128(void);
+HashMap CreateHashMap256(void);
 void FreeHashMap(HashMap hashmap);
 HashMap HMResize(HashMap hashmap);
 

@@ -1,2 +1,7 @@
 BasedOnStyle: LLVM
 SortIncludes: Never
+ColumnLimit: 0
+AllowShortIfStatementsOnASingleLine: Always
+AllowShortBlocksOnASingleLine: Always
+AllowShortLoopsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All

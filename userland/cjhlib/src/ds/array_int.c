@@ -2,175 +2,163 @@
 #include <ds/array_int.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <core/panic.h>
+#include <string.h>
 
 // Creates IntArr with capacity of 8,
 // Caller is responsible for freeing
-IntArr CreateIntArr() {
+IntArr NewIntArr() {
   IntArr intArr;
-  size_t capacity = 8;
-  size_t len = 0;
+  usize capacity = 8;
+  usize len = 0;
   intArr.data = cmalloc(capacity * sizeof(int));
   intArr.capacity = capacity;
-  intArr.length = len;
+  intArr.len = len;
   return intArr;
 }
 
-// Created IntArr with capacity specified with @size_t length,
+// Created IntArr with capacity specified with @usize len,
 // Caller is responsible for freeing
-IntArr CreateIntArrFromData(int *data, size_t length) {
+IntArr NewIntArrFromData(int *data, usize length) {
   IntArr intArr;
-  size_t capacity = (data == NULL || length == 0) ? 8 : length;
+  usize capacity = (data == NULL || length == 0) ? 8 : length;
+
   int *tmp = cmalloc(capacity * sizeof(int));
-  size_t len = 0;
   if (data != NULL && length > 0) {
-    len = length;
-    for (size_t i = 0; i < len; i++) {
-      tmp[i] = data[i];
-    }
+    memcpy(tmp, data, (length * sizeof(int)));
+    intArr.data = tmp;
+    intArr.capacity = capacity;
+    intArr.len = length;
+  } else {
+    intArr.len = 0;
+    intArr.data = tmp;
+    intArr.capacity = capacity;
   }
-  intArr.data = tmp;
-  intArr.capacity = capacity;
-  intArr.length = len;
+
   return intArr;
 }
 
-IntArr CreateIntArrWithCapacity(size_t capacity) {
+IntArr NewIntArrWithCapacity(usize capacity) {
+  if (capacity == 0) {
+    capacity = INIT_CAPACITY;
+  }
   IntArr arr;
   int *tmp = cmalloc(capacity * sizeof(int));
   arr.capacity = capacity;
-  arr.length = 0;
+  arr.len = 0;
   arr.data = tmp;
   return arr;
 }
 
 // Appends value at last index of array
-IntArr IAAppend(IntArr arr, int value) {
-  if (arr.length >= arr.capacity) {
-    arr = IAResize(arr);
+void IntArrAppend(IntArr *arr, int value) {
+  if (arr->len >= arr->capacity) {
+    *arr = IntArrResize(*arr);
   }
-  arr.data[arr.length] = value;
-  arr.length++;
-  return arr;
+  arr->data[arr->len] = value;
+  arr->len++;
+  return;
 }
 
 // Doubles size of old array and copies over data to new array
-IntArr IAResize(IntArr arr) {
+IntArr IntArrResize(IntArr arr) {
   int *tmp;
-  size_t newCapacity = arr.capacity * 2;
-  tmp = realloc(arr.data, newCapacity * sizeof(int));
-  if (!tmp) {
-    fprintf(stderr, "Resize: realloc failed\n");
-    exit(1);
-  }
+  usize newCapacity = arr.capacity * 2;
+  tmp = crealloc(arr.data, newCapacity * sizeof(int));
   arr.capacity = newCapacity;
   arr.data = tmp;
   return arr;
 }
 
-IntArr IAInsert(IntArr arr, size_t index, int value) {
-  if (index > arr.length) {
-    fprintf(stderr, "Insert: insert out of bounds\n");
-    exit(1);
+void IntArrInsert(IntArr *arr, usize index, int value) {
+  if (index > arr->len) {
+    panic("insert out of bounds error");
+  }
+  if (arr->len + 1 >= arr->capacity) {
+    *arr = IntArrResize(*arr);
   }
 
-  if (arr.length + 1 >= arr.capacity) {
-    arr = IAResize(arr);
-  }
-
-  int *tmp = cmalloc(arr.capacity * sizeof(int));
-
-  for (size_t i = 0; i < arr.length; i++) {
-    if (i < index) {
-      tmp[i] = arr.data[i];
-    } else {
-      tmp[i + 1] = arr.data[i];
-    }
-  }
-
-  tmp[index] = value;
-
-  cfree(arr.data);
-  arr.length = arr.length + 1;
-  arr.data = tmp;
-  return arr;
+  // memmove uses a *ptr -> offset and a bytecount to manipulate buffers
+  // shift everything from index onward one slot to the right
+  memmove(&arr->data[index + 1], &arr->data[index], (arr->len - index) * sizeof(int));
+  arr->data[index] = value;
+  arr->len++;
+  return;
 }
 
-IntArr IADelete(IntArr arr, size_t index) {
-  if (index >= arr.length) {
-    fprintf(stderr, "Delete: out of bounds\n");
-    exit(1);
+void IntArrDelete(IntArr *arr, usize index) {
+  if (index >= arr->len) {
+    panic("delete out of bounds error");
   }
-
-  int *tmp = cmalloc(arr.capacity * sizeof(int));
-
-  for (size_t i = 0; i < arr.length; i++) {
-    if (i < index) {
-      tmp[i] = arr.data[i];
-    } else {
-      tmp[i] = arr.data[i + 1];
-    }
-  }
-
-  cfree(arr.data);
-  arr.length = arr.length - 1;
-  arr.data = tmp;
-  return arr;
+  // arr.len - index - 1 "closes" the gap for the old number
+  memmove(&arr->data[index], &arr->data[index + 1], (arr->len - index - 1) * sizeof(int));
+  arr->len--;
+  return;
 }
 
 // Returns value at specified index
-int IAGet(IntArr arr, int index) {
-  if (index < 0 || index >= (int)arr.length) {
-    fprintf(stderr, "Get: index %d out of bounds (length: %zu)\n", index,
-            arr.length);
-    exit(1);
+int IntArrGet(IntArr *arr, usize index) {
+  if (index >= arr->len) {
+    panic("get arr out of bounds error");
   }
-  return arr.data[index];
+  return arr->data[index];
 }
 
 // Sets value at specified index
-IntArr IASet(IntArr arr, int index, int value) {
-  if (index < 0 || index >= (int)arr.length) {
-    fprintf(stderr, "Set: index %d out of bounds (length: %zu)\n", index,
-            arr.length);
-    exit(1);
+void IntArrSet(IntArr *arr, usize index, int value) {
+  if (index >= arr->len) {
+    panic("set arr out of bounds error");
   }
-  arr.data[index] = value;
-  return arr;
+  arr->data[index] = value;
+  return;
 }
 
 // Returns capacity of array
-size_t IAGetCapacity(IntArr arr) { return arr.capacity; }
+usize IntArrGetCapacity(IntArr *arr) { return arr->capacity; }
 
-// Returns length of array
-size_t IAGetLen(IntArr arr) { return arr.length; }
+// Returns len of array
+usize IntArrGetLen(IntArr *arr) { return arr->len; }
 
-// Decrements length of array by 1 at the last index
-IntArr IAPop(IntArr arr) {
-  if (arr.length < 1) {
-    fprintf(stderr, "Pop: array is empty\n");
-    exit(1);
+// Decrements len of array by 1 at the last index
+void IntArrPop(IntArr *arr) {
+  if (arr->len < 1) {
+    panic("array is empty");
   }
-  arr.length--;
-  return arr;
+  arr->len--;
 }
 
 // Returns the value at the last index of the array
-int IAPeek(IntArr arr) {
-  if (arr.length == 0) {
-    fprintf(stderr, "Peek: array is empty\n");
-    exit(1);
+int IntArrPeek(const IntArr *arr) {
+  if (arr->len == 0) {
+    panic("arr is empty");
   }
-  return arr.data[arr.length - 1];
+  return arr->data[arr->len - 1];
 }
 
 // Returns 1 if value exists in the array or 0 if the value is never found
-int IASearch(IntArr arr, int value) {
-  for (size_t i = 0; i < arr.length; i++) {
-    if (arr.data[i] == value) {
-      return 1;
+bool IntArrSearch(const IntArr *arr, int value) {
+  for (usize i = 0; i < arr->len; i++) {
+    if (arr->data[i] == value) {
+      return true;
     }
   }
-  return 0;
+  return false;
 }
 
-void FreeIntArr(IntArr arr) { cfree(arr.data); }
+IntArr IntArrCpy(IntArr arr) {
+  IntArr dupArr;
+  int *tmp = cmalloc(arr.len * sizeof(int));
+  memcpy(tmp, arr.data, (arr.len * sizeof(int)));
+  dupArr.data = tmp;
+  dupArr.len = arr.len;
+  dupArr.capacity = arr.len;
+  return dupArr;
+}
+
+void IntArrClr(IntArr *arr) {
+  arr->len = 0;
+}
+
+void FreeIntArr(IntArr *arr) {
+  FREE(arr->data);
+}

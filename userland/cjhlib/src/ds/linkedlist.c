@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-LinkedList CreateLinkedList() {
+LinkedList CreateLinkedList(void) {
   LinkedList linkedlist;
   linkedlist.head = NULL;
   linkedlist.length = 0;

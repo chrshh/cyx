@@ -10,7 +10,7 @@ typedef struct {
   size_t length;
 } LinkedList;
 
-LinkedList CreateLinkedList();
+LinkedList CreateLinkedList(void);
 LinkedList CreateLinkedListFromData(int *data, size_t length);
 
 LinkedList LLPrepend(LinkedList linkedlist, int value);
