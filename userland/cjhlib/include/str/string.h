@@ -1,11 +1,16 @@
-#pragma once
+#ifndef STRING_H
+#define STRING_H
 
 #include <stddef.h>
+#include <core/types.h>
+#include <stdbool.h>
+
+#define INIT_CAPACITY 24
 
 typedef struct {
   char *chars;
-  size_t len;
-  size_t capacity;
+  usize len;
+  usize capacity;
 } String;
 
 /**
@@ -17,21 +22,23 @@ typedef struct {
  *  - Dont check for '\0' in loops, let the bounds check handle that
  **/
 
-String NewString(void);
-void FreeString(String str);
-String StringResize(String str);
+String NewStr(void);
+void FreeStr(String *str);
+String StrResize(String str);
 
-String StringAppend(String str, char *c);
-String StringAppendStr(String str1, String str2);
-String StringCopy(String str);
-String StringFromLiteral(char *c);
-String StringPop(String str);
-String StringTrim(String str);
+String StrAppend(String str, const char *c);
+String StrDup(String str);
+String StrFromChar(const char *c);
+String StrPop(String str);
+String StrTrim(String str);
 
-String StringSlice(String str, size_t start, size_t end);
-int StringContains(String str, char *c);
-int StringIndexOf(String str);
+String StrSlice(String str, usize start, usize end);
+bool StrContains(String str, char *c);
+bool StrStartsWith(String str, char *prefix);
+String StrReplaceChar(String str, char *target, char *replacement);
 
-int StringEquals(String str1, String str2);
-int IsEmpty(char *s);
-int len(String str);
+bool StrEq(String str1, String str2);
+bool StrEmpty(char *s);
+int StrLen(String str);
+
+#endif
