@@ -11,13 +11,16 @@ typedef enum {
   NUMBER,
   LESS,
   GREATER,
-  GREATERGREATER,
+  GREATER_GREATER,
   SEMICOLON,
   BACKSLASH,
   PIPE,
   DOLLAR,
   EQUALS,
-  WORD
+  WORD,
+  AND_AND,
+  OR_OR,
+  AMPERSAND,
 } Lexeme;
 
 typedef struct {

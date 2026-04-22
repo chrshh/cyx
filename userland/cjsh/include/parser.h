@@ -1,50 +1,47 @@
 #ifndef CJSH_PARSE_H
 #define CJSH_PARSE_H
 
+#include "ast.h"
+#include "core/types.h"
 #include "lexer.h"
 #include <stddef.h>
-typedef struct Command Command;
 typedef struct ParserState ParserState;
-
-typedef enum {
-  SIMPLE,
-  ASSIGNMENT,
-  PIPELINE,
-} CmdType;
-
-struct Command {
-  char *cmd;
-  char **args;
-  size_t numArgs;
-  Command *next; // for pipes
-  CmdType cmdType;
-  int isEnv; // for env vars
-  char *outFile;
-  char *inFile;
-  char *appendFile;
-  char *errFile;
-};
 
 struct ParserState {
   Token *tokens;
-  size_t numTokens;
-  size_t pos;
+  usize numTokens;
+  usize pos;
 };
 
-ParserState initParserState(size_t numTokens);
+ParserState initParserState(usize numTokens);
 void destroyParserState(ParserState *psr);
 
 void parse(ParserState *psr);
 Token *peekNext(ParserState *psr);
 
-Command *parseStr(ParserState *psr, Command *cmd);
-Command *parseNum(ParserState *psr, Command *cmd);
-Command *parseWrd(ParserState *psr, Command *cmd);
-Command *parsePipe(ParserState *psr, Command *cmd);
-Command *parseEq(ParserState *psr, Command *cmd);
-Command *parseVar(ParserState *psr, Command *cmd);
+ASTNode *parseStr(ParserState *psr, ASTNode *cmd);
+ASTNode *parseNum(ParserState *psr, ASTNode *cmd);
+ASTNode *parseWrd(ParserState *psr, ASTNode *cmd);
+ASTNode *parsePipe(ParserState *psr, ASTNode *cmd);
+ASTNode *parseEq(ParserState *psr, ASTNode *cmd);
+ASTNode *parseVar(ParserState *psr, ASTNode *cmd);
 char *expandVar(char *rawval);
 char *expandVarInStr(char *rawval);
 char *concatVar(char *rawval, char *expandedVar);
+
+/**
+ * This function decides between parseStatement OR parseSimpleCmd by
+ * looking at wether token[0] == WORD && token[1] == '='
+ */
+ASTNode *parseStatement(ParserState *psr);
+
+ASTNode *parseSimpleCmd(ParserState *psr);
+ASTNode *parseAssignment(ParserState *psr, char *name);
+
+/**
+ * This function builds the list of WordParts*
+ * Each time a '$' token is reached, WordPartType = WP_VAR, otherwise it is always a LITERAL
+ */
+WordPart *parseWord(ParserState *psr);
 
 #endif

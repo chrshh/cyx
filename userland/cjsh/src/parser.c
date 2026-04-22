@@ -1,4 +1,3 @@
-#include "common.h"
 #include <str/string.h>
 #include <parser.h>
 #include <core/memory.h>
@@ -8,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <core/types.h>
 
 ParserState initParserState(size_t numTokens) {
   ParserState psr;
@@ -30,15 +30,15 @@ void parse(ParserState *psr) {
   /**
    * Create Space for args[], set main command to the very first token
    **/
-  Command *cmd = cmalloc(sizeof(Command));
-  memset(cmd, 0, sizeof(Command));
+  ASTNode *cmd = cmalloc(sizeof(ASTNode));
+  memset(cmd, 0, usize(ASTNode));
   cmd->args = cmalloc((psr->numTokens + 1) * (sizeof(char *)));
   memset(cmd->args, 0, (psr->numTokens + 1) * sizeof(char *));
   cmd->cmd = psr->tokens[0].literal;
   cmd->args[0] = psr->tokens[0].literal;
   psr->pos = 1;
   cmd->numArgs = 1;
-  Command *head = cmd;
+  ASTNode *head = cmd;
 
   while (psr->pos < psr->numTokens) {
     if (psr->pos > psr->numTokens) {
@@ -83,28 +83,28 @@ Token *peekNextToken(ParserState *psr) {
   return &psr->tokens[psr->pos + 1];
 }
 
-Command *parseWrd(ParserState *psr, Command *cmd) {
+ASTNode *parseWrd(ParserState *psr, ASTNode *cmd) {
   cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
   cmd->numArgs++;
   psr->pos++;
   return cmd;
 }
 
-Command *parseStr(ParserState *psr, Command *cmd) {
+ASTNode *parseStr(ParserState *psr, ASTNode *cmd) {
   cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
   psr->pos++;
   cmd->numArgs++;
   return cmd;
 }
 
-Command *parseNum(ParserState *psr, Command *cmd) {
+ASTNode *parseNum(ParserState *psr, ASTNode *cmd) {
   cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
   psr->pos++;
   cmd->numArgs++;
   return cmd;
 }
 
-Command *parseEq(ParserState *psr, Command *cmd) {
+ASTNode *parseEq(ParserState *psr, ASTNode *cmd) {
   Token *nxtToken = peekNextToken(psr);
   if (nxtToken == NULL) {
     printf("cjsh: missing assignment");
@@ -163,7 +163,7 @@ char *expandVarInStr(char *fullStr) {
 }
 
 // $PATH
-Command *parseVar(ParserState *psr, Command *cmd) {
+ASTNode *parseVar(ParserState *psr, ASTNode *cmd) {
   psr->pos++;
   char *var = psr->tokens[psr->pos].literal;
   var = expandVar(var);
@@ -182,14 +182,14 @@ char *expandVar(char *var) {
   return res;
 }
 
-Command *parsePipe(ParserState *psr, Command *cmd) {
+ASTNode *parsePipe(ParserState *psr, ASTNode *cmd) {
   Token *nxtToken = peekNextToken(psr);
   if (nxtToken == NULL) {
     printf("cjsh: broken pipe");
     exit(1);
   }
   cmd->args[cmd->numArgs] = NULL;
-  Command *newCmd = cmalloc(sizeof(Command));
+  ASTNode *newCmd = cmalloc(sizeof(ASTNode));
   newCmd->args = cmalloc((psr->numTokens + 1) * (sizeof(char *)));
   memset(newCmd->args, 0, (psr->numTokens + 1) * sizeof(char *));
   newCmd->cmd = nxtToken->literal;
