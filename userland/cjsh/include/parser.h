@@ -6,12 +6,19 @@
 typedef struct Command Command;
 typedef struct ParserState ParserState;
 
+typedef enum {
+  SIMPLE,
+  ASSIGNMENT,
+  PIPELINE,
+} CmdType;
+
 struct Command {
   char *cmd;
   char **args;
   size_t numArgs;
   Command *next; // for pipes
-  int isEnv;     // for env vars
+  CmdType cmdType;
+  int isEnv; // for env vars
   char *outFile;
   char *inFile;
   char *appendFile;
@@ -37,6 +44,7 @@ Command *parsePipe(ParserState *psr, Command *cmd);
 Command *parseEq(ParserState *psr, Command *cmd);
 Command *parseVar(ParserState *psr, Command *cmd);
 char *expandVar(char *rawval);
+char *expandVarInStr(char *rawval);
 char *concatVar(char *rawval, char *expandedVar);
 
 #endif

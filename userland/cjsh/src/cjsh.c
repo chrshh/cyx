@@ -34,8 +34,8 @@ int main() {
 
     String shPrompt = GetShPrompt();
 
-    printf(CYAN "%s " RESET, shPrompt.chars);
-    char *input = readline(RED "~ " RESET);
+    printf(BOLD CYAN "%s " RESET, shPrompt.chars);
+    char *input = readline(BOLD RED "~ " RESET);
     if (!input)
       break;
     if (!(IsEmpty(input))) {

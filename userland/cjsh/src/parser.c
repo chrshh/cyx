@@ -1,3 +1,4 @@
+#include "common.h"
 #include <str/string.h>
 #include <parser.h>
 #include <core/memory.h>
@@ -110,28 +111,62 @@ Command *parseEq(ParserState *psr, Command *cmd) {
     exit(1);
   }
   cmd->isEnv = 1;
-
-  // If we run into key=$val:
-  // - increment pos from '=' to '$' to <val>
-  // if (strcmp(nxtToken->literal, "$") == 0) {
-  //   psr->pos++;
-  //   psr->pos++;
-  //   return parseVar(psr, cmd);
-  // } else {
-  psr->pos++;
-  cmd->args[cmd->numArgs] = nxtToken->literal;
-  psr->pos++;
-  cmd->numArgs++;
-  return cmd;
+  if (peekNextToken(psr)->literal[0] == '$') {
+    if (strncmp(cmd->cmd, "echo", 4) == 0) {
+      cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
+      cmd->numArgs++;
+    }
+    printf("DOLLAR FOUND\n");
+    psr->pos++;
+    char *var = psr->tokens[psr->pos].literal;
+    var = expandVarInStr(var);
+    printf("VAR: %s\n", var);
+    cmd->args[cmd->numArgs] = var;
+    psr->pos++;
+    psr->pos++;
+    cmd->numArgs++;
+    return cmd;
+  } else {
+    psr->pos++;
+    cmd->args[cmd->numArgs] = nxtToken->literal;
+    psr->pos++;
+    cmd->numArgs++;
+    return cmd;
+  }
 }
 
+char *expandVarInStr(char *fullStr) {
+  char *delim = ":";
+  char *envVar = cmalloc(strlen(fullStr) * sizeof(char *));
+  char *suffix = cmalloc(strlen(fullStr) * sizeof(char *));
+  memset(envVar, 0, strlen(fullStr) * sizeof(char *));
+  memset(suffix, 0, strlen(fullStr) * sizeof(char *));
+  usize idx = 1;
+  usize jdx = 0;
+
+  while (fullStr[idx] != delim[0] && fullStr[idx] != '\0' && idx < strlen(fullStr)) {
+    envVar[idx - 1] = fullStr[idx];
+    idx++;
+  }
+
+  while (fullStr[idx] != '\0' && idx < strlen(fullStr)) {
+    suffix[jdx] = fullStr[idx];
+    jdx++;
+    idx++;
+  }
+
+  envVar = expandVar(envVar);
+
+  strncat(envVar, suffix, strlen(fullStr) * sizeof(char *) + 1);
+
+  return envVar;
+}
+
+// $PATH
 Command *parseVar(ParserState *psr, Command *cmd) {
   psr->pos++;
   char *var = psr->tokens[psr->pos].literal;
   var = expandVar(var);
-  if (var == NULL) {
-    printf("cjsh: NO ENV FOUND");
-  }
   cmd->args[cmd->numArgs] = var;
   psr->pos++;
   cmd->numArgs++;

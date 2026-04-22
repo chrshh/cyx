@@ -20,7 +20,8 @@ int execute(Command *cmd) {
   int pid_count = 0;
 
   // SINGLE CMD
-  if (cmd->next == NULL && cmd->isEnv != 1) {
+  // cmd->isEnv != 1 ADD THiS BACK IN AFTER TESTING
+  if (cmd->next == NULL) {
     // Check Built in first
     for (size_t i = 0; i < builtins_len; i++) {
       if (strcmp(builtins[i].name, cmd->args[0]) == 0) {
@@ -46,9 +47,9 @@ int execute(Command *cmd) {
   }
 
   // Handle ENV assignments
-  if (cmd->next == NULL && cmd->isEnv == 1) {
-    return expt(cmd->args);
-  }
+  // if (cmd->next == NULL && cmd->isEnv == 1) {
+  //   return expt(cmd->args);
+  // }
 
   // PIPE CHAIN
   while (cmd != NULL) {

@@ -4,12 +4,13 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <limits.h>
+#include <string.h>
 #include <unistd.h>
 #include <core/memory.h>
 
 int isAlphaNum(char c) { return isalpha(c) || isdigit(c); }
 int isShChar(char c) {
-  return c == '*' || c == '?' || c == '.' || c == '/' || c == '-' || c == '\\';
+  return c == '*' || c == '?' || c == '.' || c == '-' || c == '\\';
 }
 
 /* Print util used for handling a user error that is recoverable: eg.
@@ -32,8 +33,11 @@ void FreeShPrompt(String shPrompt) { cfree(shPrompt.chars); }
 void PrintDebugTokensLXR(LexerState *lxr) {
   printf("--- LXR --- \nNUM_TOKENS=%zu\n", lxr->numTokens);
   Token *tokens = lxr->tokens;
-  for (size_t i = 0; i < lxr->numTokens; i++) {
-    printf("Token %zu: %s\n\n", i + 1, tokens[i].literal);
+  for (usize i = 1; i < lxr->numTokens; i++) {
+    printf("Token %zu: %s\n\n", i, tokens[i].literal);
+    for (usize j = 0; j < strlen(tokens[i].literal); j++) {
+      printf("Character %zu: %c\n", j, tokens[i].literal[j]);
+    }
   }
 }
 
