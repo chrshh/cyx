@@ -4,7 +4,7 @@
 
   docker run -it cjyx
 
-## Run as PID 1 (no init process wrapping your shell)
+## Run as PID 1 (no init process wrapping shell)
 
 docker run -it --init=false cjyx
 
