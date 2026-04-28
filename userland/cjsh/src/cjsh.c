@@ -13,7 +13,7 @@
 #include <setjmp.h>
 
 sigjmp_buf prompt_jmp;
-size_t bufsz = BUFFER_SIZE;
+size_t lxrbufsz = BUFFER_SIZE;
 
 int main() {
   signal(SIGINT, fatal_error_signal);
@@ -21,7 +21,7 @@ int main() {
   setenv("PATH", "usr/bin/", 0);
 
   while (1) {
-    LexerState lxr = initLexerState(bufsz);
+    LexerState lxr = initLexerState(lxrbufsz);
     if (lxr.source == NULL) {
       panic("allocation failed");
     }
@@ -38,7 +38,7 @@ int main() {
     char *input = readline(BOLD RED "~ " RESET);
     if (!input)
       break;
-    if (!(IsEmpty(input))) {
+    if (!(StrEmpty(input))) {
       add_history(input);
       lxr.sourceLen = strlen(input);
       lxr.source = input;

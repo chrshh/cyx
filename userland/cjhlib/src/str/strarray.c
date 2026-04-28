@@ -36,7 +36,7 @@ StrArr Split(String str, char delim) {
       arr = StrArrResize(arr);
     }
     if (str.chars[i] == delim) {
-      String newStr = StringSlice(str, delimIdx, i);
+      String newStr = StrSlice(str, delimIdx, i);
       arr.strs[arrIdx] = newStr;
       arrIdx++;
       delimIdx = i + 1;
@@ -44,7 +44,7 @@ StrArr Split(String str, char delim) {
     }
   }
 
-  String newStr = StringSlice(str, delimIdx, str.len);
+  String newStr = StrSlice(str, delimIdx, str.len);
   arr.strs[arrIdx] = newStr;
   arr.len++;
 

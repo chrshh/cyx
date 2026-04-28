@@ -13,7 +13,7 @@
 int cd(char **argv) {
   String path;
   if (argv[1] != NULL) {
-    path = StringFromLiteral(argv[1]);
+    path = StrFromChar(argv[1]);
   }
   if (path.chars == NULL) {
     return (0);
@@ -29,7 +29,7 @@ int pwd(char **argv) {
   char buf[PATH_MAX];
   char *cwd = getcwd(buf, PATH_MAX);
   String wd;
-  wd = StringFromLiteral(cwd);
+  wd = StrFromChar(cwd);
   printf("%s\n", wd.chars);
   return 0;
 }
@@ -94,7 +94,5 @@ int bi(char **argv) {
   return 0;
 }
 
-Builtin builtins[] = {{"cd", cd},   {"pwd", pwd},         {"expt", expt},
-                      {"ext", ext}, {"prntenv", prntenv}, {"rstenv", rstenv},
-                      {"bi", bi}};
+Builtin builtins[] = {{"cd", cd}, {"pwd", pwd}, {"expt", expt}, {"ext", ext}, {"prntenv", prntenv}, {"rstenv", rstenv}, {"bi", bi}};
 size_t builtins_len = sizeof(builtins) / sizeof(builtins[0]);

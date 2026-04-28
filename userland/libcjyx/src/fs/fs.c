@@ -96,29 +96,29 @@ DIR *OpenDir(char *path) {
 
 // Takes octal val (sb.st_mode & 0777) and formats
 String FormatPermsOctal(int perm) {
-  String permstr = NewString();
+  String permstr = NewStr();
   char str[4];
 
   sprintf(str, "%o", perm);
   for (int i = 0; i < 3; i++) {
     switch (str[i]) {
     case '7':
-      permstr = StringAppend(permstr, "rwx");
+      StrAppend(&permstr, "rwx");
       break;
     case '6':
-      permstr = StringAppend(permstr, "rw-");
+      StrAppend(&permstr, "rw-");
       break;
     case '5':
-      permstr = StringAppend(permstr, "r-x");
+      StrAppend(&permstr, "r-x");
       break;
     case '4':
-      permstr = StringAppend(permstr, "r--");
+      StrAppend(&permstr, "r--");
       break;
     default:
-      permstr = StringAppend(permstr, "---");
+      StrAppend(&permstr, "---");
       break;
     }
   }
-  permstr = StringAppend(permstr, "@");
+  StrAppend(&permstr, "@");
   return permstr;
 }

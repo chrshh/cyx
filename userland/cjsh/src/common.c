@@ -1,6 +1,5 @@
 #include "common.h"
 #include "core/ansi.h"
-#include "parser.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <limits.h>
@@ -18,10 +17,10 @@ int isShChar(char c) {
 void PrintShWarning(char *msg) { printf(YELLOW "cjsh: %s" RESET, msg); }
 
 String GetShPrompt() {
-  String path = NewString();
+  String path = NewStr();
   char buf[PATH_MAX];
   char *cwd = getcwd(buf, PATH_MAX);
-  path = StringFromLiteral(cwd);
+  path = StrFromChar(cwd);
   StrArr str = Split(path, '/');
   path = str.strs[str.len - 1];
   cfree(str.strs);
@@ -41,15 +40,15 @@ void PrintDebugTokensLXR(LexerState *lxr) {
   }
 }
 
-void PrintDebugPSR(Command *head) {
-  printf("--- PSR CMD ---\n");
-  int cmdIdx = 0;
-  while (head != NULL) {
-    printf("CMD %d: %s\n", cmdIdx, head->args[0]);
-    for (size_t i = 0; i < head->numArgs; i++) {
-      printf("  ARG[%zu]: %s\n", i, head->args[i]);
-    }
-    head = head->next;
-    cmdIdx++;
-  }
-}
+// void PrintDebugPSR(Command *head) {
+//   printf("--- PSR CMD ---\n");
+//   int cmdIdx = 0;
+//   while (head != NULL) {
+//     printf("CMD %d: %s\n", cmdIdx, head->args[0]);
+//     for (size_t i = 0; i < head->numArgs; i++) {
+//       printf("  ARG[%zu]: %s\n", i, head->args[i]);
+//     }
+//     head = head->next;
+//     cmdIdx++;
+//   }
+// }

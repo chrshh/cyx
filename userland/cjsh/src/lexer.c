@@ -11,7 +11,7 @@
 LexerState initLexerState(size_t bufsz) {
   LexerState lxr = {.tokens = NULL,
                     .numTokens = 0,
-                    .capcity = INIT_CAPACITY,
+                    .capcity = INIT_LXR_CAPACITY,
                     .source = (char *)cmalloc(bufsz),
                     .curr = 0,
                     .sourceLen = 0};
@@ -189,7 +189,7 @@ void scanToken(LexerState *lxr) {
   case '>':
     if (peek(lxr) == '>') {
       advance(lxr);
-      addToken(lxr, GREATERGREATER, NULL, 0);
+      addToken(lxr, GREATER_GREATER, NULL, 0);
     } else {
       addToken(lxr, GREATER, NULL, 0);
     }
@@ -245,7 +245,7 @@ const char *lexemeToString(Lexeme type) {
     return "<";
   case GREATER:
     return ">";
-  case GREATERGREATER:
+  case GREATER_GREATER:
     return ">>";
   case BACKSLASH:
     return "\\";

@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <str/string.h>
 #include <parser.h>
 #include <core/memory.h>
@@ -8,6 +9,8 @@
 #include <string.h>
 #include <limits.h>
 #include <core/types.h>
+
+// PrintDebugPSR(node);
 
 ParserState initParserState(size_t numTokens) {
   ParserState psr;
@@ -23,58 +26,15 @@ void destroyParserState(ParserState *psr) {
 }
 
 void parse(ParserState *psr) {
-  if (psr->numTokens < 1) {
-    panic("0 tokens");
-  }
-
-  /**
-   * Create Space for args[], set main command to the very first token
-   **/
-  ASTNode *cmd = cmalloc(sizeof(ASTNode));
-  memset(cmd, 0, usize(ASTNode));
-  cmd->args = cmalloc((psr->numTokens + 1) * (sizeof(char *)));
-  memset(cmd->args, 0, (psr->numTokens + 1) * sizeof(char *));
-  cmd->cmd = psr->tokens[0].literal;
-  cmd->args[0] = psr->tokens[0].literal;
-  psr->pos = 1;
-  cmd->numArgs = 1;
-  ASTNode *head = cmd;
+  if (psr->numTokens == 0) return;
 
   while (psr->pos < psr->numTokens) {
-    if (psr->pos > psr->numTokens) {
-      return;
-    }
-    switch (psr->tokens[psr->pos].lexeme) {
-    case WORD:
-      cmd = parseWrd(psr, cmd);
-      break;
-    case NUMBER:
-      cmd = parseNum(psr, cmd);
-      break;
-    case STRING:
-      cmd = parseStr(psr, cmd);
-      break;
-    case PIPE:
-      cmd = parsePipe(psr, cmd);
-      break;
-    case EQUALS:
-      cmd = parseEq(psr, cmd);
-      break;
-    case DOLLAR:
-      cmd = parseVar(psr, cmd);
-      break;
-    default:
-      printf("command not recognized\n");
-      break;
-    }
+    ASTNode *node = parseStatement(psr);
+    if (node == NULL) return;
+    execute(node);
+    freeAstNodes(*node);
   }
-  cmd->args[cmd->numArgs] = NULL;
-
-  // PrintDebugPSR(head);
-  execute(head);
 }
-
-// int match(ParserState *psr) {}
 
 Token *peekNextToken(ParserState *psr) {
   if (psr->pos + 1 >= psr->numTokens) {
@@ -83,121 +43,190 @@ Token *peekNextToken(ParserState *psr) {
   return &psr->tokens[psr->pos + 1];
 }
 
-ASTNode *parseWrd(ParserState *psr, ASTNode *cmd) {
-  cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
-  cmd->numArgs++;
-  psr->pos++;
-  return cmd;
-}
+// The entry point — looks at token[0] and token[1] to decide:
+// if token[0] is WORD and token[1] is EQUALS -> parseAssignment
+// otherwise -> parseSimpleCmd
+ASTNode *parseStatement(ParserState *psr) {
+  if (psr->pos >= psr->numTokens) return NULL;
 
-ASTNode *parseStr(ParserState *psr, ASTNode *cmd) {
-  cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
-  psr->pos++;
-  cmd->numArgs++;
-  return cmd;
-}
+  Token currToken = psr->tokens[psr->pos];
 
-ASTNode *parseNum(ParserState *psr, ASTNode *cmd) {
-  cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
-  psr->pos++;
-  cmd->numArgs++;
-  return cmd;
-}
-
-ASTNode *parseEq(ParserState *psr, ASTNode *cmd) {
-  Token *nxtToken = peekNextToken(psr);
-  if (nxtToken == NULL) {
-    printf("cjsh: missing assignment");
-    exit(1);
-  }
-  cmd->isEnv = 1;
-  if (peekNextToken(psr)->literal[0] == '$') {
-    if (strncmp(cmd->cmd, "echo", 4) == 0) {
-      cmd->args[cmd->numArgs] = psr->tokens[psr->pos].literal;
-      cmd->numArgs++;
+  if (strcmp(currToken.literal, "export") == 0 || strcmp(currToken.literal, "expt") == 0 || strcmp(currToken.literal, "local") == 0 || strcmp(currToken.literal, "readonly") == 0) {
+    if (peekNextToken(psr) == NULL) {
+      printf("NOTHING TO EXPORT");
+      return NULL;
     }
-    printf("DOLLAR FOUND\n");
+    char *name = peekNextToken(psr)->literal;
     psr->pos++;
-    char *var = psr->tokens[psr->pos].literal;
-    var = expandVarInStr(var);
-    printf("VAR: %s\n", var);
-    cmd->args[cmd->numArgs] = var;
+    while (psr->tokens[psr->pos].lexeme != EQUALS && psr->pos < psr->numTokens) {
+      psr->pos++;
+    }
     psr->pos++;
-    psr->pos++;
-    cmd->numArgs++;
-    return cmd;
-  } else {
-    psr->pos++;
-    cmd->args[cmd->numArgs] = nxtToken->literal;
-    psr->pos++;
-    cmd->numArgs++;
-    return cmd;
-  }
-}
-
-char *expandVarInStr(char *fullStr) {
-  char *delim = ":";
-  char *envVar = cmalloc(strlen(fullStr) * sizeof(char *));
-  char *suffix = cmalloc(strlen(fullStr) * sizeof(char *));
-  memset(envVar, 0, strlen(fullStr) * sizeof(char *));
-  memset(suffix, 0, strlen(fullStr) * sizeof(char *));
-  usize idx = 1;
-  usize jdx = 0;
-
-  while (fullStr[idx] != delim[0] && fullStr[idx] != '\0' && idx < strlen(fullStr)) {
-    envVar[idx - 1] = fullStr[idx];
-    idx++;
-  }
-
-  while (fullStr[idx] != '\0' && idx < strlen(fullStr)) {
-    suffix[jdx] = fullStr[idx];
-    jdx++;
-    idx++;
-  }
-
-  envVar = expandVar(envVar);
-
-  strncat(envVar, suffix, strlen(fullStr) * sizeof(char *) + 1);
-
-  return envVar;
-}
-
-// $PATH
-ASTNode *parseVar(ParserState *psr, ASTNode *cmd) {
-  psr->pos++;
-  char *var = psr->tokens[psr->pos].literal;
-  var = expandVar(var);
-  cmd->args[cmd->numArgs] = var;
-  psr->pos++;
-  cmd->numArgs++;
-  return cmd;
-}
-
-// Returns fully expanded
-char *expandVar(char *var) {
-  char *res = getenv(var);
-  if (res == NULL) {
+    int exported = 1;
+    return parseAssignment(psr, name, exported);
     return NULL;
   }
-  return res;
+
+  if (currToken.lexeme == WORD && peekNextToken(psr) != NULL) {
+    if (peekNextToken(psr)->lexeme == EQUALS) {
+      char *name = currToken.literal;
+      psr->pos++;
+      psr->pos++;
+      int exported = 0;
+      return parseAssignment(psr, name, exported);
+    }
+  }
+
+  return parseSimpleCmd(psr);
 }
 
-ASTNode *parsePipe(ParserState *psr, ASTNode *cmd) {
-  Token *nxtToken = peekNextToken(psr);
-  if (nxtToken == NULL) {
-    printf("cjsh: broken pipe");
-    exit(1);
+// Looks at current token, consumes tokens until it hits a boundary
+// (pipe, equals at statement level, end of input), returns the WordPart list
+WordPart *parseWrd(ParserState *psr) {
+  Token currToken = psr->tokens[psr->pos];
+  WordPart *word = cmalloc(sizeof(WordPart));
+  word->next = NULL;
+
+  if (currToken.lexeme == DOLLAR) {
+    if (peekNextToken(psr) != NULL) {
+      word->literal = peekNextToken(psr)->literal;
+      word->type = WP_VAR;
+      psr->pos++;
+    } else {
+      printf("EMTPY AFTER $");
+      return NULL;
+    }
+  } else if (currToken.lexeme == EQUALS) {
+    word->literal = "=";
+    word->type = WP_LITERAL;
+  } else if (currToken.lexeme == STRING) {
+    WordPart *head = NULL;
+    WordPart *tail = NULL;
+    char *str = currToken.literal;
+    int i = 0;
+    int start = 0;
+
+    while (str[i] != '\0') {
+      if (str[i] == '$') {
+        // emit literal chunk before the $
+        if (i > start) {
+          WordPart *lit = cmalloc(sizeof(WordPart));
+          lit->type = WP_LITERAL;
+          lit->literal = strndup(str + start, (usize)(i - start));
+          lit->next = NULL;
+          if (head == NULL) head = lit;
+          else
+            tail->next = lit;
+          tail = lit;
+        }
+        i++; // skip the $
+        start = i;
+        // consume var name: letters, digits, underscore
+        while (isalnum(str[i]) || str[i] == '_') i++;
+        // emit var chunk
+        WordPart *var = cmalloc(sizeof(WordPart));
+        var->type = WP_VAR;
+        var->literal = strndup(str + start, (usize)(i - start));
+        var->next = NULL;
+        if (head == NULL) head = var;
+        else
+          tail->next = var;
+        tail = var;
+        start = i;
+      } else {
+        i++;
+      }
+    }
+    // emit any remaining literal after the last var
+    if (i > start) {
+      WordPart *lit = cmalloc(sizeof(WordPart));
+      lit->type = WP_LITERAL;
+      lit->literal = strndup(str + start, (usize)(i - start));
+      lit->next = NULL;
+      if (head == NULL) head = lit;
+      else
+        tail->next = lit;
+      tail = lit;
+    }
+
+    cfree(word);
+    psr->pos++;
+    return head;
+  } else if (currToken.lexeme == WORD) {
+    word->literal = currToken.literal;
+    word->type = WP_LITERAL;
   }
-  cmd->args[cmd->numArgs] = NULL;
-  ASTNode *newCmd = cmalloc(sizeof(ASTNode));
-  newCmd->args = cmalloc((psr->numTokens + 1) * (sizeof(char *)));
-  memset(newCmd->args, 0, (psr->numTokens + 1) * sizeof(char *));
-  newCmd->cmd = nxtToken->literal;
-  newCmd->args[0] = nxtToken->literal;
-  newCmd->numArgs = 1;
-  newCmd->next = NULL;
-  cmd->next = newCmd;
   psr->pos++;
-  psr->pos++;
-  return newCmd;
+  return word;
+}
+
+// Called when we know we have a command — consumes the command name
+// then calls parseWord() in a loop for each argument until end of input or pipe
+ASTNode *parseSimpleCmd(ParserState *psr) {
+  if (psr->pos >= psr->numTokens) return NULL;
+  SimpleCmd cmd;
+  cmd.numArgs = 0;
+  cmd.args = cmalloc(psr->numTokens * sizeof(WordPart *));
+
+  while (psr->pos < psr->numTokens) {
+    if (psr->tokens[psr->pos].lexeme == PIPE || psr->tokens[psr->pos].lexeme == SEMICOLON) break;
+    WordPart *word = parseWrd(psr);
+    if (word == NULL) {
+      return NULL;
+    }
+
+    // Merge adjacent tokens (no whitespace gap) into the same arg
+    while (psr->pos < psr->numTokens &&
+           psr->tokens[psr->pos].lexeme != PIPE &&
+           psr->tokens[psr->pos].lexeme != SEMICOLON) {
+      Token *prev = &psr->tokens[psr->pos - 1];
+      Token *curr = &psr->tokens[psr->pos];
+      // Compute where the previous token ends in the source
+      int prevEnd = prev->pos;
+      if (prev->lexeme == STRING) prevEnd += (int)strlen(prev->literal) + 2;
+      else if (prev->literal)
+        prevEnd += (int)strlen(prev->literal);
+      else
+        prevEnd += 1;
+      // If there's a gap, these are separate args
+      if (curr->pos != prevEnd) break;
+
+      WordPart *next = parseWrd(psr);
+      if (next == NULL) break;
+
+      // Append to tail of current word chain
+      WordPart *tail = word;
+      while (tail->next != NULL) tail = tail->next;
+      tail->next = next;
+    }
+
+    cmd.args[cmd.numArgs] = word;
+    cmd.numArgs++;
+  }
+
+  ASTNode *node = cmalloc(sizeof(ASTNode));
+  node->type = SIMPLE_CMD;
+  node->simpleCmd.args = cmd.args;
+  node->simpleCmd.numArgs = cmd.numArgs;
+  return node;
+}
+
+// Called when we know we have NAME=value — name is passed in because
+// parseStatement already consumed it to figure out which branch to take
+ASTNode *parseAssignment(ParserState *psr, char *name, int exported) {
+  WordPart *word = cmalloc(sizeof(WordPart));
+  word->next = NULL;
+
+  word = parseWrd(psr);
+  if (word == NULL) {
+    printf("NULL FROM ASSIGNMENT");
+    return NULL;
+  }
+
+  ASTNode *node = cmalloc(sizeof(ASTNode));
+  node->type = ASSIGNMENT;
+  node->assignment.name = name;
+  node->assignment.value = word;
+  node->assignment.export = exported;
+  return node;
 }

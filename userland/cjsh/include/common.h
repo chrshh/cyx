@@ -1,7 +1,6 @@
 #pragma once
 
 #include "lexer.h"
-#include "parser.h"
 #include <str/strarray.h>
 #ifndef CJSH_COMMON_H
 #define CJSH_COMMON_H
@@ -19,6 +18,6 @@ int isShChar(char c);
 
 void PrintShWarning(char *msg);
 void PrintDebugTokensLXR(LexerState *lxr);
-void PrintDebugPSR(Command *cmd);
+// void PrintDebugPSR(Command *cmd);
 
 #endif

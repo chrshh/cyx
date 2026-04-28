@@ -2,7 +2,7 @@
 #define LEXER_H_
 
 #define BUFFER_SIZE 256
-#define INIT_CAPACITY 8
+#define INIT_LXR_CAPACITY 8
 
 #include <stddef.h>
 

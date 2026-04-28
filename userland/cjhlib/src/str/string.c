@@ -4,6 +4,23 @@
 #include <str/string.h>
 #include <string.h>
 
+_Thread_local StrError str_errno = STR_OK;
+
+const char *StrErrMessage(StrError err) {
+  switch (err) {
+  case STR_OK:
+    return "ok";
+  case STR_ERR_INVALID_ARG:
+    return "invalid argument";
+  case STR_ERR_NULL_INPUT:
+    return "null input";
+  case STR_ERR_OUT_OF_BOUNDS:
+    return "out of bounds";
+  default:
+    "unknown error";
+  }
+}
+
 String NewStr() {
   String str;
   str.capacity = INIT_CAPACITY;
@@ -38,21 +55,21 @@ String StrFromChar(const char *chars) {
   return str;
 }
 
-String StrAppend(String str, const char *c) {
+void StrAppend(String *str, const char *c) {
   if (!c) {
-    return str;
+    return;
   }
   usize clen = strlen(c);
-  usize len = str.len + clen;
+  usize len = str->len + clen;
   String newStr = NewStr();
   newStr.len = len;
   newStr.capacity = len;
   newStr.chars = cmalloc(len + 1);
-  memcpy(newStr.chars, str.chars, str.len);
-  memcpy(newStr.chars + str.len, c, clen);
-  FreeStr(&str);
+  memcpy(newStr.chars, str->chars, str->len);
+  memcpy(newStr.chars + str->len, c, clen);
+  FreeStr(str);
   newStr.chars[len] = '\0';
-  return newStr;
+  return;
 }
 
 bool StrEq(String str1, String str2) {
@@ -97,10 +114,9 @@ String StrTrim(String str) {
 }
 
 String StrSlice(String str, usize start, usize end) {
-  if (!(start >= end) || !(end > str.len)) panic("unable to slice string");
   String newStr = NewStr();
 
-  for (usize i = 0; i < end; i++) {
+  for (size_t i = 0; i < end; i++) {
     if (newStr.len >= newStr.capacity) {
       newStr = StrResize(newStr);
     }
@@ -110,7 +126,6 @@ String StrSlice(String str, usize start, usize end) {
     }
   }
   newStr.chars[newStr.len] = '\0';
-  FreeStr(&str);
 
   return newStr;
 }
@@ -158,15 +173,33 @@ bool StrStartsWith(String str, char *prefix) {
   return true;
 }
 
-String StrReplaceChar(String str, char *t, char *r) {
-  if (t[1] != '\0' || r[1] != '\0') {
-    panic("cannot replace multiple characters at once");
-  }
-
+String StrReplaceChar(String str, char t, char r) {
   for (usize i = 0; i < str.len; i++) {
-    if (str.chars[i] == t[0]) {
-      str.chars[i] = r[0];
+    if (str.chars[i] == t) {
+      str.chars[i] = r;
     }
   }
   return str;
+}
+
+String StrConcat(const String *str1, const String *str2) {
+  if (str1 == NULL || str2 == NULL) {
+    str_errno = STR_ERR_NULL_INPUT;
+    return STR_INVALID;
+  }
+  String res;
+  usize fullLen = str1->len + str2->len;
+
+  /** The full string length is len(str1) + len(str2)
+   *  We allocate the full string length + 1 for '\0'
+   *  Copy str1 -> return buff, if str1 is 10 characters this means res[0-9] is written into
+   *  Copy str2 -> return buff OFFSET by str1, otherwise we ovverwrite the same memory (bad bug)
+   *  This is the standard safe pattern for combining all data (char, int, etc)
+   */
+  res.chars = cmalloc(fullLen + 1);
+  memcpy(res.chars, str1->chars, str1->len);
+  memcpy(res.chars + str1->len, str2->chars, str2->len);
+  res.chars[fullLen] = '\0';
+
+  return res;
 }
