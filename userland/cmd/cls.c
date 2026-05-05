@@ -27,7 +27,7 @@ void PrintEntries(struct dirent *dp, struct stat *sb, int flags) {
 
   if (flags & LS_LONG) {
     String perms = FormatPermsOctal(sb->st_mode & 0777);
-    printf("%s %llo  ", perms.chars, sb->st_size);
+    printf("%s %lo  ", perms.chars, sb->st_size);
   }
 
   if (dp->d_type == DT_DIR) {
