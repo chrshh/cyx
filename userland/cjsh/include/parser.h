@@ -25,6 +25,7 @@ Token *peekNext(ParserState *psr);
 ASTNode *parseStatement(ParserState *psr);
 ASTNode *parseSimpleCmd(ParserState *psr);
 ASTNode *parseAssignment(ParserState *psr, char *name, int exported);
+ASTNode *parsePipelineCmd(ParserState *psr);
 
 /**
  * This function builds the list of WordParts*

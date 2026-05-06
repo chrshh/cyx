@@ -46,6 +46,15 @@ char *expandWord(WordPart *words) {
   return res;
 }
 
+ASTNode *makePipelineCmd(SimpleCmd **cmds, usize numCmds) {
+  ASTNode *pipelineCmd = cmalloc(sizeof(ASTNode));
+
+  pipelineCmd->type = PIPELINE;
+  pipelineCmd->pipeline.cmds = cmds;
+  pipelineCmd->pipeline.numCmds = numCmds;
+  return pipelineCmd;
+}
+
 void freeAstNodes(ASTNode node) {
   usize idx = 0;
   switch (node.type) {
@@ -56,7 +65,19 @@ void freeAstNodes(ASTNode node) {
     }
     break;
   case ASSIGNMENT:
-  case PIPELINE:
+    break;
+  case PIPELINE:;
+    usize numCmds = node.pipeline.numCmds;
+    usize i = 0;
+    usize argIdx = 0;
+    while (i < numCmds - 1) {
+      while (node.pipeline.cmds[i]->args != NULL) {
+        freeWordParts(node.pipeline.cmds[i]->args[argIdx]);
+        node.pipeline.cmds[i]->args = NULL;
+        argIdx++;
+      }
+      i++;
+    }
     break;
   }
 }

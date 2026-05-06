@@ -77,7 +77,7 @@ ASTNode *parseStatement(ParserState *psr) {
     }
   }
 
-  return parseSimpleCmd(psr);
+  return parsePipelineCmd(psr);
 }
 
 // Looks at current token, consumes tokens until it hits a boundary
@@ -160,10 +160,29 @@ WordPart *parseWrd(ParserState *psr) {
   return word;
 }
 
-// Called when we know we have a command — consumes the command name
+ASTNode *parsePipelineCmd(ParserState *psr) {
+  SimpleCmd **cmds = cmalloc(256 * sizeof(SimpleCmd *));
+  usize count = 0;
+
+  ASTNode *node = parseSimpleCmd(psr);
+  cmds[count++] = &node->simpleCmd;
+
+  while (psr->tokens[psr->pos].lexeme == PIPE) {
+    psr->pos++;
+    node = parseSimpleCmd(psr);
+    cmds[count++] = &node->simpleCmd;
+  }
+
+  if (count == 1) return node;
+
+  return makePipelineCmd(cmds, count);
+}
+
+// Called when we know we have a command, consumes the command name
 // then calls parseWord() in a loop for each argument until end of input or pipe
 ASTNode *parseSimpleCmd(ParserState *psr) {
   if (psr->pos >= psr->numTokens) return NULL;
+  ASTNode *node = cmalloc(sizeof(ASTNode));
   SimpleCmd cmd;
   cmd.numArgs = 0;
   cmd.args = cmalloc(psr->numTokens * sizeof(WordPart *));
@@ -204,7 +223,6 @@ ASTNode *parseSimpleCmd(ParserState *psr) {
     cmd.numArgs++;
   }
 
-  ASTNode *node = cmalloc(sizeof(ASTNode));
   node->type = SIMPLE_CMD;
   node->simpleCmd.args = cmd.args;
   node->simpleCmd.numArgs = cmd.numArgs;

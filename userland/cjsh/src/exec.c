@@ -19,6 +19,9 @@ int execute(ASTNode *node) {
   pid_t pid;
   int wstatus;
 
+  pid_t pids[64];
+  int pid_count = 0;
+
   switch (nodeType) {
   case SIMPLE_CMD:
     argv = cmalloc((node->simpleCmd.numArgs + 1) * sizeof(char *));
@@ -74,7 +77,8 @@ int execute(ASTNode *node) {
       argv = cmalloc((cmd->numArgs + 1) * sizeof(char *));
 
       for (usize j = 0; j < cmd->numArgs; j++) {
-        argv[i] = expandWord(cmd->args[j]);
+        argv[j] = expandWord(cmd->args[j]);
+        argv[cmd->numArgs] = NULL;
       }
 
       pid = fork();
@@ -84,7 +88,7 @@ int execute(ASTNode *node) {
           dup2(prev_rd_fd, STDIN_FILENO);
           close(prev_rd_fd);
         }
-        if (node->pipeline.cmds[i + 1] != NULL) {
+        if (i < node->pipeline.numCmds - 1) {
           dup2(fds[1], STDOUT_FILENO);
           close(fds[0]);
           close(fds[1]);
@@ -95,7 +99,7 @@ int execute(ASTNode *node) {
         exit(1);
       } else {
         // Parent Process
-        if (node->pipeline.cmds[i + 1] != NULL) {
+        if (i < node->pipeline.numCmds - 1) {
           close(fds[1]);
           prev_rd_fd = fds[0];
         } else {
@@ -103,10 +107,14 @@ int execute(ASTNode *node) {
         }
       }
 
-      free(argv);
+      // free(argv);
+      pids[pid_count++] = pid;
       i++;
     }
-    printf("ight");
+
+    for (int i = 0; i < pid_count; i++) {
+      waitpid(pids[i], &wstatus, WUNTRACED | WCONTINUED);
+    }
     break;
   }
   // PIPE CHAIN
