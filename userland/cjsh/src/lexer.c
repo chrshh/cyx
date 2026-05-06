@@ -95,7 +95,6 @@ void scanner(LexerState *lxr) {
     lxr->start = lxr->curr;
     scanToken(lxr);
   }
-  // PrintDebugTokensLXR(lxr);
 }
 
 void string(LexerState *lxr) {
@@ -129,6 +128,7 @@ void string(LexerState *lxr) {
   addToken(lxr, STRING, val, 0.0);
 }
 
+// This has glob expansion baked in, note for future me
 void word(LexerState *lxr) {
   while (isAlphaNum(peek(lxr)) || isShChar(peek(lxr))) {
     advance(lxr);

@@ -10,8 +10,6 @@
 #include <limits.h>
 #include <core/types.h>
 
-// PrintDebugPSR(node);
-
 ParserState initParserState(size_t numTokens) {
   ParserState psr;
   psr.numTokens = numTokens;
@@ -48,33 +46,11 @@ Token *peekNextToken(ParserState *psr) {
 // otherwise -> parseSimpleCmd
 ASTNode *parseStatement(ParserState *psr) {
   if (psr->pos >= psr->numTokens) return NULL;
-
   Token currToken = psr->tokens[psr->pos];
 
-  if (strcmp(currToken.literal, "export") == 0 || strcmp(currToken.literal, "expt") == 0 || strcmp(currToken.literal, "local") == 0 || strcmp(currToken.literal, "readonly") == 0) {
-    if (peekNextToken(psr) == NULL) {
-      printf("NOTHING TO EXPORT");
-      return NULL;
-    }
-    char *name = peekNextToken(psr)->literal;
-    psr->pos++;
-    while (psr->tokens[psr->pos].lexeme != EQUALS && psr->pos < psr->numTokens) {
-      psr->pos++;
-    }
-    psr->pos++;
-    int exported = 1;
-    return parseAssignment(psr, name, exported);
-    return NULL;
-  }
-
-  if (currToken.lexeme == WORD && peekNextToken(psr) != NULL) {
-    if (peekNextToken(psr)->lexeme == EQUALS) {
-      char *name = currToken.literal;
-      psr->pos++;
-      psr->pos++;
-      int exported = 0;
-      return parseAssignment(psr, name, exported);
-    }
+  ASTNode *exportNode = parseExport(psr, currToken);
+  if (exportNode != NULL) {
+    return exportNode;
   }
 
   return parsePipelineCmd(psr);
@@ -99,59 +75,10 @@ WordPart *parseWrd(ParserState *psr) {
   } else if (currToken.lexeme == EQUALS) {
     word->literal = "=";
     word->type = WP_LITERAL;
+
   } else if (currToken.lexeme == STRING) {
-    WordPart *head = NULL;
-    WordPart *tail = NULL;
-    char *str = currToken.literal;
-    int i = 0;
-    int start = 0;
+    return parseInterpolatedStr(psr, currToken, word);
 
-    while (str[i] != '\0') {
-      if (str[i] == '$') {
-        // emit literal chunk before the $
-        if (i > start) {
-          WordPart *lit = cmalloc(sizeof(WordPart));
-          lit->type = WP_LITERAL;
-          lit->literal = strndup(str + start, (usize)(i - start));
-          lit->next = NULL;
-          if (head == NULL) head = lit;
-          else
-            tail->next = lit;
-          tail = lit;
-        }
-        i++; // skip the $
-        start = i;
-        // consume var name: letters, digits, underscore
-        while (isalnum(str[i]) || str[i] == '_') i++;
-        // emit var chunk
-        WordPart *var = cmalloc(sizeof(WordPart));
-        var->type = WP_VAR;
-        var->literal = strndup(str + start, (usize)(i - start));
-        var->next = NULL;
-        if (head == NULL) head = var;
-        else
-          tail->next = var;
-        tail = var;
-        start = i;
-      } else {
-        i++;
-      }
-    }
-    // emit any remaining literal after the last var
-    if (i > start) {
-      WordPart *lit = cmalloc(sizeof(WordPart));
-      lit->type = WP_LITERAL;
-      lit->literal = strndup(str + start, (usize)(i - start));
-      lit->next = NULL;
-      if (head == NULL) head = lit;
-      else
-        tail->next = lit;
-      tail = lit;
-    }
-
-    cfree(word);
-    psr->pos++;
-    return head;
   } else if (currToken.lexeme == WORD) {
     word->literal = currToken.literal;
     word->type = WP_LITERAL;
@@ -247,4 +174,88 @@ ASTNode *parseAssignment(ParserState *psr, char *name, int exported) {
   node->assignment.value = word;
   node->assignment.export = exported;
   return node;
+}
+
+// Helper function to control path for export commands
+ASTNode *parseExport(ParserState *psr, Token currToken) {
+  if (strcmp(currToken.literal, "export") == 0 || strcmp(currToken.literal, "expt") == 0 || strcmp(currToken.literal, "local") == 0 || strcmp(currToken.literal, "readonly") == 0) {
+    if (peekNextToken(psr) == NULL) {
+      printf("NOTHING TO EXPORT");
+      return NULL;
+    }
+    char *name = peekNextToken(psr)->literal;
+    psr->pos++;
+    while (psr->tokens[psr->pos].lexeme != EQUALS && psr->pos < psr->numTokens) {
+      psr->pos++;
+    }
+    psr->pos++;
+    int exported = 1;
+    return parseAssignment(psr, name, exported);
+  }
+
+  if (currToken.lexeme == WORD && peekNextToken(psr) != NULL) {
+    if (peekNextToken(psr)->lexeme == EQUALS) {
+      char *name = currToken.literal;
+      psr->pos++;
+      psr->pos++;
+      int exported = 0;
+      return parseAssignment(psr, name, exported);
+    }
+  }
+  return NULL;
+}
+
+WordPart *parseInterpolatedStr(ParserState *psr, Token currToken, WordPart *word) {
+  WordPart *head = NULL;
+  WordPart *tail = NULL;
+  char *str = currToken.literal;
+  int i = 0;
+  int start = 0;
+
+  while (str[i] != '\0') {
+    if (str[i] == '$') {
+      // emit literal chunk before the $
+      if (i > start) {
+        WordPart *lit = cmalloc(sizeof(WordPart));
+        lit->type = WP_LITERAL;
+        lit->literal = strndup(str + start, (usize)(i - start));
+        lit->next = NULL;
+        if (head == NULL) head = lit;
+        else
+          tail->next = lit;
+        tail = lit;
+      }
+      i++; // skip the $
+      start = i;
+      // consume var name: letters, digits, underscore
+      while (isalnum(str[i]) || str[i] == '_') i++;
+      // emit var chunk
+      WordPart *var = cmalloc(sizeof(WordPart));
+      var->type = WP_VAR;
+      var->literal = strndup(str + start, (usize)(i - start));
+      var->next = NULL;
+      if (head == NULL) head = var;
+      else
+        tail->next = var;
+      tail = var;
+      start = i;
+    } else {
+      i++;
+    }
+  }
+  // emit any remaining literal after the last var
+  if (i > start) {
+    WordPart *lit = cmalloc(sizeof(WordPart));
+    lit->type = WP_LITERAL;
+    lit->literal = strndup(str + start, (usize)(i - start));
+    lit->next = NULL;
+    if (head == NULL) head = lit;
+    else
+      tail->next = lit;
+    tail = lit;
+  }
+
+  cfree(word);
+  psr->pos++;
+  return head;
 }

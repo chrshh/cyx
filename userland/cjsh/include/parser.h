@@ -28,6 +28,12 @@ ASTNode *parseAssignment(ParserState *psr, char *name, int exported);
 ASTNode *parsePipelineCmd(ParserState *psr);
 
 /**
+ * These subfunctions help route to their higher level functions
+ */
+ASTNode *parseExport(ParserState *psr, Token currToken);
+WordPart *parseInterpolatedStr(ParserState *psr, Token currToken, WordPart *word);
+
+/**
  * This function builds the list of WordParts*
  * Each time a '$' token is reached, WordPartType = WP_VAR, otherwise it is always a LITERAL
  */
