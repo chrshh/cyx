@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
@@ -36,16 +38,27 @@ int main(void) {
 
   if (getpid() != 1) return 1;
   chdir("/");
-  mount("proc", "/proc", 0, NULL);
-  mount("sysfs", "/sys", 0, NULL);
-  mount("devtmpfs", "/dev", 0, NULL);
+  mount("proc", "/proc", "proc", 0, NULL);
+  mount("sysfs", "/sys", "sys", 0, NULL);
+  mount("devtmpfs", "/dev", "dev", 0, NULL);
 
-  // Not sure if this goes here
-  open("/dev/console", O_RDWR);
+  /**
+   * @brief Opens the console and allocates file descriptors
+   */
+  int fd = open("/dev/console", O_RDWR);
+  if (fd == -1) {
+    perror("/dev/console failed to open");
+    exit(EXIT_FAILURE);
+  }
+
+  dup2(fd, STDIN_FILENO);
+  dup2(fd, STDOUT_FILENO);
+  dup2(fd, STDERR_FILENO);
+  close(fd);
 
   sigfillset(&set);
   sigprocmask(SIG_BLOCK, &set, NULL);
-  spawn((char *[]){"/bin/cjsh"});
+  spawn((char *[]){"/bin/cjsh", NULL});
 
   while (1) {
     sigwait(&set, &sig);
@@ -64,8 +77,14 @@ static void sigpoweroff(void) {
   reboot(RB_POWER_OFF);
 }
 
+/**
+ * @note Once the shell is not the only child process,
+ * I need to store cjsh's pid and only respawn when that pid is returned
+ */
 static void sigreap(void) {
   while (waitpid(-1, NULL, WNOHANG) > 0);
+  // Respawn our boy
+  spawn((char *[]){"/bin/cjsh", NULL});
 }
 
 static void sigreboot(void) {
@@ -78,6 +97,8 @@ static void spawn(char *const argv[]) {
   case 0:
     sigprocmask(SIG_UNBLOCK, &set, NULL);
     setsid();
+    // Manually assign a controlling terminal to the process spawned
+    ioctl(STDIN_FILENO, TIOCSCTTY, 0);
     execvp(argv[0], argv);
     perror("execvp");
     _exit(1);

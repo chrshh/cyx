@@ -12,3 +12,15 @@ userland/cjsh/cjsh
 userland/cjsh/tests/test_lexer
 userland/cjsh/tests/test_parser
 userland/cjsh/tests/test_ast
+
+# build artifacts
+build/
+initramfs/init
+initramfs/initramfs.cpio.gz
+initramfs/rootfs/init
+initramfs/rootfs/bin/
+initramfs/rootfs/dev/
+initramfs/rootfs/proc/
+initramfs/rootfs/sys/
+initramfs/rootfs/tmp/
+initramfs/rootfs/root/
