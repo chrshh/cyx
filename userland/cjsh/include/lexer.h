@@ -57,4 +57,6 @@ void string(LexerState *lxr);
 void number(LexerState *lxr);
 void word(LexerState *lxr);
 
+const char *lexemeToString(Lexeme type);
+
 #endif

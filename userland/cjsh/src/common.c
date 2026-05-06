@@ -16,7 +16,7 @@ int isShChar(char c) {
  * unterminated string */
 void PrintShWarning(char *msg) { printf(YELLOW "cjsh: %s" RESET, msg); }
 
-String GetShPrompt() {
+String GetShPrompt(void) {
   String path = NewStr();
   char buf[PATH_MAX];
   char *cwd = getcwd(buf, PATH_MAX);

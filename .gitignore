@@ -2,3 +2,13 @@
 *.a
 run_*
 bin/
+
+# macOS
+.DS_Store
+*.dSYM/
+
+# cjsh
+userland/cjsh/cjsh
+userland/cjsh/tests/test_lexer
+userland/cjsh/tests/test_parser
+userland/cjsh/tests/test_ast

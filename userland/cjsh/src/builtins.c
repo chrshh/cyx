@@ -9,6 +9,9 @@
 #include <fs/fs.h>
 #include <core/panic.h>
 
+Builtin builtins[] = {{"cd", cd}, {"pwd", pwd}, {"expt", expt}, {"ext", ext}, {"prntenv", prntenv}, {"rstenv", rstenv}, {"bi", bi}};
+size_t builtins_len = sizeof(builtins) / sizeof(builtins[0]);
+
 /* cd */
 int cd(char **argv) {
   String path;
@@ -93,6 +96,3 @@ int bi(char **argv) {
   }
   return 0;
 }
-
-Builtin builtins[] = {{"cd", cd}, {"pwd", pwd}, {"expt", expt}, {"ext", ext}, {"prntenv", prntenv}, {"rstenv", rstenv}, {"bi", bi}};
-size_t builtins_len = sizeof(builtins) / sizeof(builtins[0]);

@@ -12,7 +12,8 @@ int isAlphaNum(char c);
  * @note   This needs to be recalculated everytime a builtin cmd is executed
  * @return Fully qualified shell prompt
  */
-String GetShPrompt();
+
+String GetShPrompt(void);
 void FreeShPrompt(String str);
 int isShChar(char c);
 
