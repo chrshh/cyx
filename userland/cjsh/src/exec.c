@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <core/panic.h>
 #include <sys/wait.h>
 #include <builtins.h>
 #include <exec.h>
@@ -67,7 +66,7 @@ int execSimpleCmd(SimpleCmd *node) {
   if (pid == 0) {
     execvp(argv[0], argv);
     printf("cjsh: command not found\n");
-    exit(1);
+    return 1;
   } else {
     curr_ch_pid = pid;
     waitpid(pid, &wstatus, WUNTRACED | WCONTINUED);

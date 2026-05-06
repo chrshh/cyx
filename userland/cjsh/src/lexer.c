@@ -3,7 +3,6 @@
 #include <lexer.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <core/panic.h>
 #include <string.h>
 #include <common.h>
 #include <glob.h>
@@ -141,7 +140,8 @@ void word(LexerState *lxr) {
     memset(&glb, 0, sizeof(glob));
     int val = glob(rawval, GLOB_TILDE, NULL, &glb);
     if (val != 0) {
-      panic("error while globbing");
+      printf("cjsh: error while globbing\n");
+      return;
     }
 
     for (size_t i = 0; i < glb.gl_pathc; i++) {

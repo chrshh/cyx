@@ -2,7 +2,6 @@
 #include <str/string.h>
 #include <parser.h>
 #include <core/memory.h>
-#include <core/panic.h>
 #include <stdio.h>
 #include <exec.h>
 #include <stdlib.h>
