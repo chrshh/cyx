@@ -4,12 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <sys/reboot.h>
 #include <unistd.h>
 #include <core/ansi.h>
 #include <fs/fs.h>
 #include <core/panic.h>
 
-Builtin builtins[] = {{"cd", cd}, {"pwd", pwd}, {"expt", expt}, {"ext", ext}, {"prntenv", prntenv}, {"rstenv", rstenv}, {"bi", bi}};
+Builtin builtins[] = {{"cd", cd}, {"shutdown", shutdown}, {"pwd", pwd}, {"expt", expt}, {"ext", ext}, {"prntenv", prntenv}, {"rstenv", rstenv}, {"bi", bi}};
 size_t builtins_len = sizeof(builtins) / sizeof(builtins[0]);
 
 /* cd */
@@ -94,5 +95,11 @@ int bi(char **argv) {
   for (size_t i = 0; i < builtins_len; i++) {
     printf("%s\n", builtins[i].name);
   }
+  return 0;
+}
+
+int shutdown(char **argv) {
+  (void)argv;
+  reboot(RB_POWER_OFF);
   return 0;
 }

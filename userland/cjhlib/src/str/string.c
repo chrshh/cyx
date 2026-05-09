@@ -61,7 +61,7 @@ void StrAppend(String *str, const char *c) {
   }
   usize clen = strlen(c);
   usize len = str->len + clen;
-  String newStr = NewStr();
+  String newStr;
   newStr.len = len;
   newStr.capacity = len;
   newStr.chars = cmalloc(len + 1);
@@ -69,7 +69,7 @@ void StrAppend(String *str, const char *c) {
   memcpy(newStr.chars + str->len, c, clen);
   FreeStr(str);
   newStr.chars[len] = '\0';
-  return;
+  *str = newStr;
 }
 
 bool StrEq(String str1, String str2) {

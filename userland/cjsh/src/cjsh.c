@@ -19,7 +19,7 @@ size_t lxrbufsz = BUFFER_SIZE;
 int main(void) {
   signal(SIGINT, fatal_error_signal);
   using_history();
-  setenv("PATH", "usr/bin/", 0);
+  setenv("PATH", "/bin:/usr/bin", 0);
 
   int interactive = isatty(STDIN_FILENO);
 

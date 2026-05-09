@@ -1,4 +1,4 @@
-.PHONY: all libs run clean
+.PHONY: all libs run static clean
 
 CC = gcc
 
@@ -13,6 +13,12 @@ BINS = $(patsubst %.c, bin/%, $(SRCS))
 
 all: bin libs $(BINS)
 
+# Static build for the disk image: the guest has no shared libs, so every
+# binary that ships in rootfs/bin must be -static. Target-specific CFLAGS
+# propagates down through `all` -> `$(BINS)` so each link adds -static.
+static: CFLAGS += -static
+static: all
+
 bin:
 	mkdir -p bin
 
@@ -23,7 +29,7 @@ libs:
 bin/%: %.c libs
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
-# make run cmd=ccat
+# make run cmd=cat
 run: bin/$(cmd)
 	./bin/$(cmd)
 

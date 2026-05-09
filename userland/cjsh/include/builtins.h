@@ -19,6 +19,7 @@ extern Builtin builtins[];
 extern size_t builtins_len;
 
 int cd(char **argv);
+int shutdown(char **argv);
 int ext(char **argv);
 int expt(char **argv);
 int pwd(char **argv);

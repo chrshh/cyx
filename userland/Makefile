@@ -15,6 +15,7 @@ cjsh: libcjyx
 
 static: libcjyx
 	$(MAKE) -C cjsh static
+	$(MAKE) -C cmd static
 
 utils: libcjyx
 	$(MAKE) -C cmd all

@@ -227,7 +227,6 @@ void scanToken(LexerState *lxr) {
     } else if (isAlphaNum(c) || isShChar(c)) {
       word(lxr);
     } else {
-      printf("unknown command\n");
       break;
     }
   }
