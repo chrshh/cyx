@@ -21,7 +21,7 @@ init: cinit.c
 # Stage the rootfs tree: binaries, /etc, and the empty mount points cinit
 # expects to bind kernel filesystems onto at boot.
 rootfs: $(ROOTFS)/init $(ROOTFS)/bin/cjsh stage-cmd $(ROOTFS)/etc/passwd
-	mkdir -p $(ROOTFS)/dev $(ROOTFS)/proc $(ROOTFS)/sys $(ROOTFS)/tmp $(ROOTFS)/root
+	mkdir -p $(ROOTFS)/dev $(ROOTFS)/proc $(ROOTFS)/sys $(ROOTFS)/tmp $(ROOTFS)/root $(ROOTFS)/home
 
 $(ROOTFS)/init: init
 	install -D -m 755 init $(ROOTFS)/init

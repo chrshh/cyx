@@ -21,6 +21,7 @@ void fatal_error_signal(int sig) {
    * Replace with proper SIGINT handling once interactive editing matters.
    */
   (void)sig;
+  sync();
   reboot(RB_POWER_OFF);
   _exit(1);
 }

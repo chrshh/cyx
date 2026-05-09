@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 
 int FileExists(String path);
+int FileExistsChar(char *path);
 int IsDir(String path);
 
 String ReadFile(String path);

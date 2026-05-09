@@ -4,6 +4,7 @@
 #include <sys/wait.h>
 #include <sys/mount.h>
 #include <sys/reboot.h>
+#include <sys/stat.h>
 
 #include <signal.h>
 #include <stdio.h>
@@ -37,10 +38,12 @@ int main(void) {
   size_t i;
 
   if (getpid() != 1) return 1;
-  chdir("/");
+  mkdir("/home", 0755);
   mount("proc", "/proc", "proc", 0, NULL);
   mount("sysfs", "/sys", "sys", 0, NULL);
   mount("devtmpfs", "/dev", "dev", 0, NULL);
+  mount("/dev/vdb", "/home", "ext4", 0, NULL);
+  chdir("/home");
 
   /**
    * @brief Opens the console and allocates file descriptors

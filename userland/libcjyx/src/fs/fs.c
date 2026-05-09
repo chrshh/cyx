@@ -1,4 +1,6 @@
+#include "str/string.h"
 #include <core/ansi.h>
+#include <core/warn.h>
 #include <core/memory.h>
 #include <core/panic.h>
 #include <dirent.h>
@@ -24,6 +26,17 @@ int FileExists(String path) {
       return 1;
     }
   }
+  perror(path.chars);
+  return 0;
+}
+
+int FileExistsChar(char *path) {
+  struct stat sb;
+  if (stat(path, &sb) == 0) {
+    if (S_ISREG(sb.st_mode)) {
+      return 1;
+    }
+  }
   return 0;
 }
 
@@ -40,7 +53,7 @@ int IsDir(String path) {
 String ReadFile(String path) {
   int exists = FileExists(path);
   if (exists == 0) {
-    panic("file does not exist");
+    return STR_INVALID;
   }
 
   String out;
@@ -52,11 +65,13 @@ String ReadFile(String path) {
 
   int fd = open(path.chars, O_RDONLY);
   if (fd == -1) {
-    panic("could not open file");
+    warn("could not open file");
+    return STR_INVALID;
   }
   ssize_t bytesread = read(fd, out.chars, filesize);
   if (bytesread == -1) {
-    panic("failed to read file");
+    warn("failed to read file");
+    return STR_INVALID;
   }
   close(fd);
 
@@ -70,17 +85,20 @@ void WriteFile(String path, String in) {
 
   int fd = open(path.chars, O_WRONLY | O_CREAT | O_TRUNC, 0644);
   if (fd == -1) {
-    panic("failed to open file");
+    perror(path.chars);
+    return;
   }
   ssize_t byteswritten = write(fd, in.chars, bytes);
   if (byteswritten == -1) {
-    panic("failed to write to file");
+    perror(in.chars);
+    return;
   }
   close(fd);
 }
 
 void ChangeDir(String path) {
   if (chdir(path.chars) == -1) {
+    perror(path.chars);
     return;
   }
 }
@@ -88,8 +106,7 @@ void ChangeDir(String path) {
 DIR *OpenDir(char *path) {
   DIR *dirp = opendir(path);
   if (dirp == NULL) {
-    perror("failed to open dir");
-    panic("failed to open dir");
+    perror(path);
   }
   return dirp;
 }
