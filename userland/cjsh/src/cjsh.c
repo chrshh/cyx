@@ -16,10 +16,23 @@
 sigjmp_buf prompt_jmp;
 size_t lxrbufsz = BUFFER_SIZE;
 
-int main(void) {
+int main(int argc, char **argv) {
+  if (argc >= 3 && strcmp(argv[1], "-c") == 0) {
+    char *cmd_string = argv[2];
+    LexerState lxr = initLexerState(lxrbufsz);
+    lxr.sourceLen = strlen(cmd_string);
+    lxr.source = cmd_string;
+    scanner(&lxr);
+    ParserState psr = initParserState(lxr.numTokens);
+    psr.tokens = lxr.tokens;
+    parse(&psr);
+    destroyParserState(&psr);
+    destroyLexerState(&lxr);
+    exit(0);
+  }
   signal(SIGINT, fatal_error_signal);
   using_history();
-  setenv("PATH", "/bin:/usr/bin", 0);
+  // setenv("PATH", "/bin:/usr/bin", 0);
 
   int interactive = isatty(STDIN_FILENO);
 

@@ -209,7 +209,6 @@ void scanToken(LexerState *lxr) {
   case '\\':
     addToken(lxr, BACKSLASH, NULL, 0);
     break;
-  case '/':
   case ':':
   case ' ':
   case '\r':

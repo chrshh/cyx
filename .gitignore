@@ -13,6 +13,12 @@ userland/cjsh/tests/test_lexer
 userland/cjsh/tests/test_parser
 userland/cjsh/tests/test_ast
 
+# userland app binaries (built in-place by each app's Makefile).
+# Add new app binaries here as you create them, or build into a bin/ subdir
+# (already covered by the top-level `bin/` rule).
+userland/apps/textr/textr
+userland/display/display
+
 # build artifacts
 build/
 initramfs/init
@@ -24,3 +30,13 @@ initramfs/rootfs/proc/
 initramfs/rootfs/sys/
 initramfs/rootfs/tmp/
 initramfs/rootfs/root/
+
+# disk/rootfs is fully assembled at build time from the Debian docker export
+# + our custom binaries. Nothing in here is hand-edited source.
+disk/rootfs/
+disk/init
+
+# kernel: upstream Linux source is huge and reproducible from kernel.org.
+# Keep only the .config (our custom build) and the README.
+kernel/src/*
+!kernel/src/.config

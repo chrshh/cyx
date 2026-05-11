@@ -9,7 +9,7 @@
 
 int isAlphaNum(char c) { return isalpha(c) || isdigit(c); }
 int isShChar(char c) {
-  return c == '*' || c == '?' || c == '.' || c == '-' || c == '\\';
+  return c == '*' || c == '?' || c == '.' || c == '-' || c == '\\' || c == '_' || c == '/';
 }
 
 /* Print util used for handling a user error that is recoverable: eg.

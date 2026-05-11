@@ -3,6 +3,9 @@
 #include <core/warn.h>
 #include <unistd.h>
 
+/*
+ * @note If no argument is present, read from stdin
+ */
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     char buf[4096];

@@ -1,0 +1,4 @@
+-I/usr/include/wlroots
+-I/usr/include/pixman-1
+-I/usr/include/libdrm
+-DWLR_USE_UNSTABLE

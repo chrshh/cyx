@@ -1,8 +1,8 @@
-.PHONY: all clean cjhlib libcjyx cjsh utils rebuild rn dbg static
+.PHONY: all clean cjhlib libcjyx cjsh utils display rebuild rn dbg static
 
 IMAGE = cjyx
 
-all: cjhlib libcjyx cjsh utils
+all: cjhlib libcjyx cjsh utils display
 
 cjhlib:
 	$(MAKE) -C cjhlib lib
@@ -13,9 +13,13 @@ libcjyx: cjhlib
 cjsh: libcjyx
 	$(MAKE) -C cjsh
 
+display: libcjyx
+	$(MAKE) -C display
+
 static: libcjyx
 	$(MAKE) -C cjsh static
 	$(MAKE) -C cmd static
+	$(MAKE) -C display static
 
 utils: libcjyx
 	$(MAKE) -C cmd all
@@ -35,3 +39,4 @@ clean:
 	$(MAKE) -C libcjyx clean
 	$(MAKE) -C cjsh clean
 	$(MAKE) -C cmd clean
+	$(MAKE) -C display clean

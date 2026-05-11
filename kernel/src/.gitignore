@@ -1,0 +1,5 @@
+# cjyx: this replaces upstream Linux's .gitignore. We only want .config
+# tracked from this tree; everything else is reproducible from kernel.org.
+# If you re-extract a fresh tarball, restore this file from git.
+*
+!.config

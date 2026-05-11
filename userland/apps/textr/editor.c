@@ -1,0 +1,171 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "textr.h"
+
+void initEditor(EditorConfig *cfg) {
+  cfg->mode = MODE_NORMAL;
+  cfg->x = 0;
+  cfg->y = 0;
+  cfg->rowoff = 0;
+  cfg->coloff = 0;
+  cfg->numrows = 0;
+  cfg->er = NULL;
+  if (getWindowSize(&cfg->rows, &cfg->cols) == -1) die("getWindowSize");
+}
+
+void repositionCursorTL(wBuf *wb) {
+  wBufAppend(wb, CURSOR_TL, 3);
+}
+
+void drawRows(wBuf *wb) {
+  int y;
+  for (y = 0; y < cfg.rows; y++) {
+    int filerow = y + cfg.rowoff;
+    if (filerow >= cfg.numrows) {
+      if (cfg.numrows == 0 && y == cfg.rows / 3) {
+        char welcome[80];
+        int welcomelen = snprintf(welcome, sizeof(welcome), "textr -- 0.1");
+        if (welcomelen > cfg.cols) welcomelen = cfg.cols;
+        int padding = (cfg.cols - welcomelen) / 2;
+        if (padding) {
+          wBufAppend(wb, "~", 1);
+          padding--;
+        }
+        while (padding--) wBufAppend(wb, " ", 1);
+        wBufAppend(wb, welcome, welcomelen);
+      } else {
+        wBufAppend(wb, "~", 1);
+      }
+
+    } else {
+      int len = cfg.er[filerow].size - cfg.coloff;
+      if (len < 0) len = 0;
+      if (len > cfg.cols) len = cfg.cols;
+      wBufAppend(wb, &cfg.er[filerow].chars[cfg.coloff], len);
+    }
+
+    wBufAppend(wb, "\x1b[K", 3);
+    if (y < cfg.rows - 1) {
+      wBufAppend(wb, "\r\n", 2);
+    }
+  }
+}
+
+void refreshScreen(void) {
+  editorScroll();
+  wBuf wb = initWBuf();
+
+  wBufAppend(&wb, CURSOR_HIDE, 6);
+  wBufAppend(&wb, "\x1b[2J", 4);
+  repositionCursorTL(&wb);
+
+  drawRows(&wb);
+
+  char buf[32];
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (cfg.y - cfg.rowoff) + 1, (cfg.x - cfg.coloff) + 1);
+  wBufAppend(&wb, buf, strlen(buf));
+
+  wBufAppend(&wb, CURSOR_SHOW, 6);
+
+  write(STDOUT_FILENO, wb.b, wb.len);
+  wBFree(&wb);
+}
+
+void clearScreen(void) {
+  write(STDOUT_FILENO, SCREEN_CLEAR, 4);
+  write(STDOUT_FILENO, CURSOR_TL, 3);
+}
+
+wBuf initWBuf() {
+  wBuf wb;
+  wb.b = NULL;
+  wb.len = 0;
+  return wb;
+}
+
+void wBufAppend(wBuf *wb, const char *s, int len) {
+  char *new = realloc(wb->b, wb->len + len);
+
+  if (new == NULL) return;
+  memcpy(&new[wb->len], s, len);
+  wb->b = new;
+  wb->len += len;
+}
+
+void wBFree(wBuf *wb) {
+  free(wb->b);
+}
+
+void moveCursor(int key) {
+  erow *row = (cfg.y >= cfg.numrows) ? NULL : &cfg.er[cfg.y];
+  switch (key) {
+
+  case 'h':
+  case ARROW_LEFT:
+    if (cfg.x != 0) {
+      cfg.x--;
+    }
+    break;
+
+  case 'j':
+  case ARROW_DOWN:
+    if (cfg.y < cfg.numrows) {
+      cfg.y++;
+    }
+    break;
+
+  case 'k':
+  case ARROW_UP:
+    if (cfg.y != 0) {
+      cfg.y--;
+    }
+    break;
+
+  case 'l':
+  case ARROW_RIGHT:
+    if (row && cfg.x < row->size) {
+      cfg.x++;
+    }
+    break;
+  }
+
+  row = (cfg.y >= cfg.numrows) ? NULL : &cfg.er[cfg.y];
+  int rowlen = row ? row->size : 0;
+  if (cfg.x > rowlen) {
+    cfg.x = rowlen;
+  }
+}
+
+void editorOpen(char *filename) {
+  FILE *fp = fopen(filename, "r");
+  if (!fp) die("fopen");
+
+  char *line = NULL;
+  size_t linecap = 0;
+  ssize_t linelen;
+  while ((linelen = getline(&line, &linecap, fp)) != -1) {
+    while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r')) linelen--;
+
+    editorAppendRow(line, linelen);
+  }
+  free(line);
+  fclose(fp);
+}
+
+void editorScroll() {
+  if (cfg.y < cfg.rowoff) {
+    cfg.rowoff = cfg.y;
+  }
+  if (cfg.y >= cfg.rowoff + cfg.rows) {
+    cfg.rowoff = cfg.y - cfg.rows + 1;
+  }
+  if (cfg.x < cfg.coloff) {
+    cfg.coloff = cfg.x;
+  }
+  if (cfg.x >= cfg.coloff + cfg.cols) {
+    cfg.coloff = cfg.x - cfg.cols + 1;
+  }
+}

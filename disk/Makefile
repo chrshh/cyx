@@ -1,44 +1,79 @@
-.PHONY: all clean rootfs image stage-cmd
+.PHONY: all clean rootfs image stage-cmd size
 
-# pipefail: catch failures inside pipelines (e.g. mkfs barking via tee).
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
 CC = gcc
 CFLAGS = -Wall -Wextra -Wpedantic -O2 $(EXTRA_FLAGS)
 
-ROOTFS := rootfs
-CJSH   := ../build/cjsh
-CMDDIR := ../build/cmd
-IMAGE  := ../build/disk.img
-SIZE   := 256M
+ROOTFS  := rootfs
+DEBIAN  := ../build/debian-rootfs
+CJSH    := ../build/cjsh
+DISPLAY := ../build/display
+CMDDIR  := ../build/cmd
+IMAGE   := ../build/disk.img
+# 12G: Mesa + GTK + Qt + Xwayland + fonts + Debian baseline runs ~2.5GB
+# extracted; ext4 overhead + headroom for /home growth + apps you'll write.
+SIZE    := 12G
+
+# The list of Debian core utilities to assassinate. 
+# Add or remove names from this list as you code your own replacements.
+PURGE_LIST := ls cat mkdir rm cp mv echo pwd date true false chown chmod uname whoami clear sleep
 
 all: init
 
 init: cinit.c
 	$(CC) $(CFLAGS) -static -o init cinit.c
 
-# Stage the rootfs tree: binaries, /etc, and the empty mount points cinit
-# expects to bind kernel filesystems onto at boot.
-rootfs: $(ROOTFS)/init $(ROOTFS)/bin/cjsh stage-cmd $(ROOTFS)/etc/passwd
-	mkdir -p $(ROOTFS)/dev $(ROOTFS)/proc $(ROOTFS)/sys $(ROOTFS)/tmp $(ROOTFS)/root $(ROOTFS)/home
+# Layered staging: Debian userland goes down first as the base, then our own
+# binaries and config files overlay on top. 
+rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display stage-cmd $(ROOTFS)/etc/passwd
+	mkdir -p $(ROOTFS)/dev $(ROOTFS)/proc $(ROOTFS)/sys $(ROOTFS)/tmp $(ROOTFS)/root $(ROOTFS)/home $(ROOTFS)/run
 
-$(ROOTFS)/init: init
+# The marker file ensures we only extract and purge once. 
+$(ROOTFS)/.staged:
+	rm -rf $(ROOTFS)
+	mkdir -p $(ROOTFS)
+	cp -a $(DEBIAN)/. $(ROOTFS)/
+	# --- THE BLOAT PURGE ---
+	# 1. Delete Debian's shells
+	rm -f $(ROOTFS)/bin/bash $(ROOTFS)/usr/bin/bash
+	rm -f $(ROOTFS)/bin/dash $(ROOTFS)/usr/bin/dash
+	# 2. Force the standard POSIX shell path to point to your custom shell
+	rm -f $(ROOTFS)/bin/sh
+	ln -sf cjsh $(ROOTFS)/bin/sh
+	# 3. Purge Debian Coreutils
+	for cmd in $(PURGE_LIST); do \
+		rm -f $(ROOTFS)/bin/$$cmd $(ROOTFS)/usr/bin/$$cmd; \
+	done
+# --- BULK DIRECTORY PURGE ---
+	# 4. Nuke all Debian documentation, manuals, and info pages
+	rm -rf $(ROOTFS)/usr/share/doc $(ROOTFS)/usr/share/man $(ROOTFS)/usr/share/info
+	# 5. Nuke package manager metadata and caches 
+	rm -rf $(ROOTFS)/var/lib/apt/lists/* $(ROOTFS)/var/cache/apt/*
+	rm -rf $(ROOTFS)/var/lib/dpkg/info/*
+# 6. Nuke foreign language translations
+	rm -rf $(ROOTFS)/usr/share/locale
+	touch $@
+
+# All overlay targets MUST depend on .staged so Make knows to re-copy them
+# if the Debian base ever gets wiped.
+$(ROOTFS)/init: init $(ROOTFS)/.staged
 	install -D -m 755 init $(ROOTFS)/init
 
-$(ROOTFS)/bin/cjsh: $(CJSH)
+$(ROOTFS)/bin/cjsh: $(CJSH) $(ROOTFS)/.staged
 	install -D -m 755 $(CJSH) $(ROOTFS)/bin/cjsh
 
-$(ROOTFS)/etc/passwd: etc/passwd etc/group etc/hostname
+$(ROOTFS)/bin/display: $(DISPLAY) $(ROOTFS)/.staged
+	install -D -m 755 $(DISPLAY) $(ROOTFS)/bin/display
+
+$(ROOTFS)/etc/passwd: etc/passwd etc/group etc/hostname $(ROOTFS)/.staged
 	mkdir -p $(ROOTFS)/etc
 	install -m 644 etc/passwd $(ROOTFS)/etc/passwd
 	install -m 644 etc/group $(ROOTFS)/etc/group
 	install -m 644 etc/hostname $(ROOTFS)/etc/hostname
 
-# Drop every static binary from build/cmd/ into rootfs/bin/. .PHONY so make
-# always re-runs it — a new file in build/cmd/ wouldn't otherwise trigger
-# anything, since no rule names it as a target.
-stage-cmd:
+stage-cmd: $(ROOTFS)/.staged
 	mkdir -p $(ROOTFS)/bin
 	if [ -d $(CMDDIR) ]; then \
 		for f in $(CMDDIR)/*; do \
@@ -46,10 +81,6 @@ stage-cmd:
 		done; \
 	fi
 
-# Build a raw ext4 disk image from the staged tree. mkfs.ext4 -d copies a
-# directory's contents into the new filesystem without needing root or a
-# loop mount — modern e2fsprogs does it offline. -F forces overwrite of an
-# existing image; truncate (re)creates the backing file at $(SIZE) first.
 image: rootfs
 	mkdir -p ../build
 	truncate -s $(SIZE) $(IMAGE)
@@ -58,3 +89,10 @@ image: rootfs
 clean:
 	rm -f init $(IMAGE)
 	rm -rf $(ROOTFS)
+
+size:
+	@echo "=== Total OS Size ==="
+	@du -sh $(ROOTFS)
+	@echo ""
+	@echo "=== Top 10 Largest Folders in OS ==="
+	@du -sh $(ROOTFS)/* | sort -rh | head -n 10
