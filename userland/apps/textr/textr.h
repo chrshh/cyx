@@ -3,9 +3,13 @@
 
 #include <stddef.h>
 #include <termios.h>
+#include <time.h>
+#include <stdbool.h>
 
 /* keys */
 #define CTRL_KEY(k) ((k) & 0x1f)
+
+#define LEADER " "
 
 /* cursor & screen */
 #define CURSOR_TL "\x1b[H"
@@ -14,6 +18,8 @@
 
 #define SCREEN_CLEAR "\x1b[2J"
 #define SCREEN_CLEAR_LINE "\x1b[K"
+
+#define TAB_STOP 8
 
 /* global state */
 typedef enum {
@@ -25,7 +31,9 @@ typedef enum {
 
 typedef struct erow {
   int size;
+  int rsize;
   char *chars;
+  char *render;
 } erow;
 
 typedef struct EditorConfig {
@@ -36,8 +44,13 @@ typedef struct EditorConfig {
   int coloff;
   int x;
   int y;
+  int rx;
   int numrows;
   erow *er;
+  bool dirty;
+  char *filename;
+  char statusmsg[8];
+  time_t statusmsg_time;
   struct termios orig_term;
 } EditorConfig;
 
@@ -59,6 +72,10 @@ int getCursorPosition(int *rows, int *cols);
 /* input.c */
 int readKey(void);
 void processKey(void);
+void handleInsertModeKey(int c);
+void handleVisualModeKey(int c);
+void handleCommandModeKey(int c);
+void handleNormalModeKey(int c);
 
 /* editor.c */
 void refreshScreen(void);
@@ -74,6 +91,18 @@ void editorScroll(void);
 
 /* rows.c */
 void editorAppendRow(char *s, size_t len);
+void editorUpdateRow(erow *er);
+int editorRowXtoRx(erow *er, int x);
+void editorRowInsertChar(erow *er, int pos, int c);
+void editorInsertChar(int c);
+char *editorRowsToStr(int *buflen);
+void editorSave();
+
+/* statbar.c */
+void editorDrawStatusBar(wBuf *wb);
+char *getModeStr(void);
+void editorSetStatusMsg(const char *fmt, ...);
+void editorDrawMsgBar(wBuf *wb);
 
 enum editorKey {
   BACKSPACE = 127,

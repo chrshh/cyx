@@ -1,8 +1,9 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
+#include <fcntl.h>
 #include "textr.h"
 
 void initEditor(EditorConfig *cfg) {
@@ -13,7 +14,13 @@ void initEditor(EditorConfig *cfg) {
   cfg->coloff = 0;
   cfg->numrows = 0;
   cfg->er = NULL;
+  cfg->dirty = false;
+  cfg->rx = 0;
+  cfg->filename = NULL;
+  cfg->statusmsg[0] = '\0';
+  cfg->statusmsg_time = 0;
   if (getWindowSize(&cfg->rows, &cfg->cols) == -1) die("getWindowSize");
+  cfg->rows -= 2;
 }
 
 void repositionCursorTL(wBuf *wb) {
@@ -41,16 +48,14 @@ void drawRows(wBuf *wb) {
       }
 
     } else {
-      int len = cfg.er[filerow].size - cfg.coloff;
+      int len = cfg.er[filerow].rsize - cfg.coloff;
       if (len < 0) len = 0;
       if (len > cfg.cols) len = cfg.cols;
-      wBufAppend(wb, &cfg.er[filerow].chars[cfg.coloff], len);
+      wBufAppend(wb, &cfg.er[filerow].render[cfg.coloff], len);
     }
 
     wBufAppend(wb, "\x1b[K", 3);
-    if (y < cfg.rows - 1) {
-      wBufAppend(wb, "\r\n", 2);
-    }
+    wBufAppend(wb, "\r\n", 2);
   }
 }
 
@@ -63,9 +68,11 @@ void refreshScreen(void) {
   repositionCursorTL(&wb);
 
   drawRows(&wb);
+  editorDrawStatusBar(&wb);
+  editorDrawMsgBar(&wb);
 
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (cfg.y - cfg.rowoff) + 1, (cfg.x - cfg.coloff) + 1);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (cfg.y - cfg.rowoff) + 1, (cfg.rx - cfg.coloff) + 1);
   wBufAppend(&wb, buf, strlen(buf));
 
   wBufAppend(&wb, CURSOR_SHOW, 6);
@@ -140,6 +147,8 @@ void moveCursor(int key) {
 }
 
 void editorOpen(char *filename) {
+  free(cfg.filename);
+  cfg.filename = strdup(filename);
   FILE *fp = fopen(filename, "r");
   if (!fp) die("fopen");
 
@@ -153,19 +162,69 @@ void editorOpen(char *filename) {
   }
   free(line);
   fclose(fp);
+  cfg.dirty = false;
 }
 
 void editorScroll() {
+  cfg.rx = 0;
+  if (cfg.y < cfg.numrows) {
+    cfg.rx = editorRowXtoRx(&cfg.er[cfg.y], cfg.x);
+  }
+
   if (cfg.y < cfg.rowoff) {
     cfg.rowoff = cfg.y;
   }
   if (cfg.y >= cfg.rowoff + cfg.rows) {
     cfg.rowoff = cfg.y - cfg.rows + 1;
   }
-  if (cfg.x < cfg.coloff) {
-    cfg.coloff = cfg.x;
+  if (cfg.rx < cfg.coloff) {
+    cfg.coloff = cfg.rx;
   }
-  if (cfg.x >= cfg.coloff + cfg.cols) {
-    cfg.coloff = cfg.x - cfg.cols + 1;
+  if (cfg.rx >= cfg.coloff + cfg.cols) {
+    cfg.coloff = cfg.rx - cfg.cols + 1;
   }
+}
+
+char *editorRowsToStr(int *buflen) {
+  int totallen = 0;
+  int j;
+
+  for (j = 0; j < cfg.numrows; j++)
+    totallen += cfg.er[j].size + 1;
+  *buflen = totallen;
+
+  char *buf = malloc(totallen);
+  char *p = buf;
+
+  for (j = 0; j < cfg.numrows; j++) {
+    memcpy(p, cfg.er[j].chars, cfg.er[j].size);
+    p += cfg.er[j].size;
+    *p = '\n';
+    p++;
+  }
+
+  return buf;
+}
+
+void editorSave() {
+  if (cfg.filename == NULL) return;
+
+  int len;
+  char *buf = editorRowsToStr(&len);
+
+  int fd = open(cfg.filename, O_RDWR | O_CREAT, 0644);
+  if (fd != -1) {
+    if (ftruncate(fd, len) != -1) {
+      if (write(fd, buf, len) == len) {
+        close(fd);
+        free(buf);
+        cfg.dirty = false;
+        editorSetStatusMsg("%d: bytes written to disk", len);
+        return;
+      }
+    }
+    close(fd);
+  }
+  free(buf);
+  editorSetStatusMsg("Failed to save. I/O error: %s", strerror(errno));
 }

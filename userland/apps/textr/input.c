@@ -10,8 +10,9 @@ int readKey(void) {
   int nread;
   char c;
 
-  nread = read(STDIN_FILENO, &c, 1);
-  if (nread == -1 && errno != EAGAIN) die("read");
+  while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+    if (nread == -1 && errno != EAGAIN) die("read");
+  }
 
   /* ESC sequences */
   if (c == '\x1b') {
@@ -42,12 +43,33 @@ int readKey(void) {
 void processKey(void) {
   int c = readKey();
 
+  switch (cfg.mode) {
+  case MODE_INSERT:
+    handleInsertModeKey(c);
+    break;
+  case MODE_NORMAL:
+    handleNormalModeKey(c);
+    break;
+  case MODE_COMMAND:
+    handleCommandModeKey(c);
+    break;
+  case MODE_VISUAL:
+    handleVisualModeKey(c);
+    break;
+  }
+}
+
+void handleNormalModeKey(int c) {
   switch (c) {
 
   /* QUIT  */
   case CTRL_KEY('q'):
     clearScreen();
     exit(0);
+    break;
+
+  case CTRL_KEY('s'):
+    editorSave();
     break;
 
   /* COMPLEX MOTIONS */
@@ -58,7 +80,6 @@ void processKey(void) {
     }
   } break;
 
-  // TODO: Find words
   case '$': {
     erow *row = (cfg.y >= cfg.numrows) ? NULL : &cfg.er[cfg.y];
     cfg.x = strlen(row->chars) - 1;
@@ -66,6 +87,18 @@ void processKey(void) {
 
   case '^':
     cfg.x = 0;
+    break;
+
+  case 'i':
+    cfg.mode = MODE_INSERT;
+    break;
+
+  case ':':
+    cfg.mode = MODE_COMMAND;
+    break;
+
+  case 'v':
+    cfg.mode = MODE_VISUAL;
     break;
 
   /* BASIC MOTIONS */
@@ -80,4 +113,50 @@ void processKey(void) {
     moveCursor(c);
     break;
   }
+}
+
+void handleCommandModeKey(int c) {
+  switch (c) {
+
+    /* QUIT  */
+  case CTRL_KEY('q'):
+    clearScreen();
+    exit(0);
+    break;
+
+  case '\x1b':
+    cfg.mode = MODE_NORMAL;
+    break;
+  }
+}
+
+void handleVisualModeKey(int c) {
+  (void)c;
+  return;
+}
+
+void handleInsertModeKey(int c) {
+  switch (c) {
+  case '\r':
+    // TODO
+    break;
+
+    /* QUIT  */
+  case CTRL_KEY('q'):
+    clearScreen();
+    exit(0);
+    break;
+
+  case BACKSPACE:
+    // TODO
+    break;
+
+  case '\x1b':
+    cfg.mode = MODE_NORMAL;
+    break;
+  default:
+    editorInsertChar(c);
+    break;
+  }
+  return;
 }
