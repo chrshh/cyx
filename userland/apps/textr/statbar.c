@@ -17,6 +17,9 @@ char *getModeStr(void) {
   case MODE_NORMAL:
     return "NORMAL";
     break;
+  default:
+    return "NORMAL";
+    break;
   }
 }
 

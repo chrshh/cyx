@@ -138,7 +138,7 @@ void handleVisualModeKey(int c) {
 void handleInsertModeKey(int c) {
   switch (c) {
   case '\r':
-    // TODO
+    editorInsertNewLine();
     break;
 
     /* QUIT  */
@@ -148,7 +148,7 @@ void handleInsertModeKey(int c) {
     break;
 
   case BACKSPACE:
-    // TODO
+    editorDelChar();
     break;
 
   case '\x1b':

@@ -3,10 +3,11 @@
 
 #include "textr.h"
 
-void editorAppendRow(char *s, size_t len) {
-  cfg.er = realloc(cfg.er, sizeof(erow) * (cfg.numrows + 1));
+void editorInsertRow(int pos, char *s, size_t len) {
+  if (pos < 0 || pos > cfg.numrows) return;
 
-  int pos = cfg.numrows;
+  cfg.er = realloc(cfg.er, sizeof(erow) * (cfg.numrows + 1));
+  memmove(&cfg.er[pos + 1], &cfg.er[pos], sizeof(erow) * (cfg.numrows - pos));
 
   cfg.er[pos].size = len;
   cfg.er[pos].chars = malloc(len + 1);
@@ -18,6 +19,20 @@ void editorAppendRow(char *s, size_t len) {
   editorUpdateRow(&cfg.er[pos]);
 
   cfg.numrows++;
+}
+
+void editorInsertNewLine(void) {
+  if (cfg.x == 0) {
+    editorInsertRow(cfg.y, "", 0);
+  } else {
+    erow *er = &cfg.er[cfg.y];
+    editorInsertRow(cfg.y + 1, &er->chars[cfg.x], er->size - cfg.x);
+    er = &cfg.er[cfg.y];
+    er->chars[er->size] = '\0';
+    editorUpdateRow(er);
+  }
+  cfg.y++;
+  cfg.x = 0;
 }
 
 void editorUpdateRow(erow *er) {
@@ -66,9 +81,55 @@ void editorRowInsertChar(erow *er, int pos, int c) {
 
 void editorInsertChar(int c) {
   if (cfg.y == cfg.numrows) {
-    editorAppendRow("", 0);
+    editorInsertRow(cfg.numrows, "", 0);
   }
   editorRowInsertChar(&cfg.er[cfg.y], cfg.x, c);
   cfg.x++;
+  cfg.dirty = true;
+}
+
+void editorFreeRow(erow *er) {
+  free(er->render);
+  free(er->chars);
+}
+
+void editorDelRow(int pos) {
+  if (pos < 0 || pos >= cfg.numrows) return;
+  editorFreeRow(&cfg.er[pos]);
+  memmove(&cfg.er[pos], &cfg.er[pos + 1], sizeof(erow) * (cfg.numrows - pos - 1));
+  cfg.numrows--;
+  cfg.dirty = true;
+}
+
+void editorRowDelChar(erow *er, int pos) {
+  if (pos < 0 || pos >= er->size) return;
+  memmove(&er->chars[pos], &er->chars[pos + 1], er->size - pos);
+  er->size--;
+  editorUpdateRow(er);
+  cfg.dirty = true;
+}
+
+void editorDelChar(void) {
+  if (cfg.y == cfg.numrows) return;
+  if (cfg.x == 0 && cfg.y == 0) return;
+
+  erow *er = &cfg.er[cfg.y];
+  if (cfg.x > 0) {
+    editorRowDelChar(er, cfg.x - 1);
+    cfg.x--;
+  } else {
+    cfg.x = cfg.er[cfg.y - 1].size;
+    editorRowAppendString(&cfg.er[cfg.y - 1], er->chars, er->size);
+    editorDelRow(cfg.y);
+    cfg.y--;
+  }
+}
+
+void editorRowAppendString(erow *er, char *s, size_t len) {
+  er->chars = realloc(er->chars, er->size + len + 1);
+  memcpy(&er->chars[er->size], s, len);
+  er->size += len;
+  er->chars[er->size] = '\0';
+  editorUpdateRow(er);
   cfg.dirty = true;
 }

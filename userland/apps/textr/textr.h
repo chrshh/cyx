@@ -90,13 +90,19 @@ void editorOpen(char *filename);
 void editorScroll(void);
 
 /* rows.c */
-void editorAppendRow(char *s, size_t len);
+void editorInsertRow(int pos, char *s, size_t len);
+void editorInsertNewLine();
 void editorUpdateRow(erow *er);
 int editorRowXtoRx(erow *er, int x);
 void editorRowInsertChar(erow *er, int pos, int c);
 void editorInsertChar(int c);
 char *editorRowsToStr(int *buflen);
 void editorSave();
+void editorRowDelChar(erow *er, int pos);
+void editorDelChar(void);
+void editorFreeRow(erow *er);
+void editorDelRow(int pos);
+void editorRowAppendString(erow *er, char *s, size_t len);
 
 /* statbar.c */
 void editorDrawStatusBar(wBuf *wb);
