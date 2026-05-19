@@ -57,7 +57,7 @@ void commandInsertChar(int c) {
   return;
 }
 
-void commandDelChar(int c) {
+void commandDelChar(void) {
   int n = strlen(cfg.cmdline);
   if (n == 1) return;
   cfg.cmdline[n - 1] = '\0';

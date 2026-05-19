@@ -44,7 +44,8 @@ void editorDrawStatusBar(wBuf *wb) {
   int rlen = snprintf(
       rstatus,
       sizeof(rstatus),
-      "%d/%d",
+      "%s | %d/%d",
+      cfg.syntax ? cfg.syntax->filetype : "no ft",
       cfg.y + 1,
       cfg.numrows);
 

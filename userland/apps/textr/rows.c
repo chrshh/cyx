@@ -8,6 +8,9 @@ void editorInsertRow(int pos, char *s, size_t len) {
 
   cfg.er = realloc(cfg.er, sizeof(erow) * (cfg.numrows + 1));
   memmove(&cfg.er[pos + 1], &cfg.er[pos], sizeof(erow) * (cfg.numrows - pos));
+  for (int j = pos + 1; j <= cfg.numrows; j++) cfg.er[j].idx++;
+
+  cfg.er[pos].idx = pos;
 
   cfg.er[pos].size = len;
   cfg.er[pos].chars = malloc(len + 1);
@@ -16,6 +19,8 @@ void editorInsertRow(int pos, char *s, size_t len) {
 
   cfg.er[pos].rsize = 0;
   cfg.er[pos].render = NULL;
+  cfg.er[pos].hl = NULL;
+  cfg.er[pos].hl_open_comment = 0;
   editorUpdateRow(&cfg.er[pos]);
 
   cfg.numrows++;
@@ -56,6 +61,8 @@ void editorUpdateRow(erow *er) {
 
   er->render[idx] = '\0';
   er->rsize = idx;
+
+  editorUpdateSyntax(er);
 }
 
 int editorRowXtoRx(erow *er, int x) {
@@ -91,12 +98,14 @@ void editorInsertChar(int c) {
 void editorFreeRow(erow *er) {
   free(er->render);
   free(er->chars);
+  free(er->hl);
 }
 
 void editorDelRow(int pos) {
   if (pos < 0 || pos >= cfg.numrows) return;
   editorFreeRow(&cfg.er[pos]);
   memmove(&cfg.er[pos], &cfg.er[pos + 1], sizeof(erow) * (cfg.numrows - pos - 1));
+  for (int j = pos; j < cfg.numrows - 1; j++) cfg.er[j].idx--;
   cfg.numrows--;
   cfg.dirty = true;
 }

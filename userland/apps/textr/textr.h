@@ -29,6 +29,16 @@
 #define SAVE (1 << 0)
 #define QUIT (1 << 1)
 
+/* colors */
+#define BLUE "\x1b[94m"
+#define GREEN "\x1b[38;2;165;214;255m"
+#define KEYWORD1 "\x1b[31m"
+#define KEYWORD2 "\x1b[31m"
+#define DEF_COLOR "\x1b[39m"
+#define COMMENT "\x1b[90m"
+#define MLCOMMENT "\x1b[90m"
+#define OPERATOR BLUE
+
 /* global state */
 typedef enum {
   MODE_NORMAL,
@@ -37,11 +47,36 @@ typedef enum {
   MODE_VISUAL
 } EditorMode;
 
+typedef enum {
+  HL_NORMAL = 0,
+  HL_NUMBER,
+  HL_STRING,
+  HL_COMMENT,
+  HL_MLCOMMENT,
+  HL_KEYWORD1,
+  HL_KEYWORD2,
+  HL_OPERATOR,
+} EditorHighlight;
+
+typedef struct {
+  char *filetype;
+  char **filematch;
+  char **keywords;
+  char *operators;
+  char *singleline_comment_start;
+  char *multiline_comment_start;
+  char *multiline_comment_end;
+  int flags;
+} EditorSyntax;
+
 typedef struct erow {
+  int idx;
   int size;
   int rsize;
   char *chars;
   char *render;
+  unsigned char *hl;
+  int hl_open_comment;
 } erow;
 
 typedef struct EditorConfig {
@@ -60,6 +95,7 @@ typedef struct EditorConfig {
   char statusmsg[80];
   time_t statusmsg_time;
   char cmdline[80];
+  EditorSyntax *syntax;
   struct termios orig_term;
 } EditorConfig;
 
@@ -123,10 +159,17 @@ void editorDrawMsgBar(wBuf *wb);
 
 /* commands.c */
 int parseCommands(char *cmd, int len);
-void execCommands();
+void execCommands(void);
 void commandInsertChar(int c);
-void commandDelChar(int c);
+void commandDelChar(void);
 void editorDrawCmdline(wBuf *wb);
+
+/* syntax_hl.c */
+void editorUpdateSyntax(erow *row);
+char *editorSyntaxToColor(int hl);
+int is_separator(int c);
+int is_operator(int c);
+void editorSetSyntaxHighlight(void);
 
 enum editorKey {
   BACKSPACE = 127,
@@ -135,5 +178,11 @@ enum editorKey {
   ARROW_UP,
   ARROW_DOWN
 };
+
+/* highlighting rules */
+#define HL_HIGHLIGHT_NUMBERS (1 << 0)
+#define HL_HIGHLIGHT_STRINGS (1 << 1)
+
+#define HLDB_ENTRIES (sizeof(HLDB) / sizeof(HLDB[0]))
 
 #endif

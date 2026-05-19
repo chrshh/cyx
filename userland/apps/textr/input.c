@@ -136,7 +136,7 @@ void handleCommandModeKey(int c) {
     break;
 
   case BACKSPACE:
-    commandDelChar(c);
+    commandDelChar();
     break;
 
   case '\x1b':

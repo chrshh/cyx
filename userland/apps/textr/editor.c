@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,14 +21,16 @@ void initEditor(EditorConfig *cfg) {
   cfg->statusmsg[0] = '\0';
   cfg->statusmsg_time = 0;
   cfg->cmdline[0] = '\0';
+  cfg->syntax = NULL;
   if (getWindowSize(&cfg->rows, &cfg->cols) == -1) die("getWindowSize");
-  cfg->rows -= 2;
+  cfg->rows -= 2; // these rows are reserved for the status bar(s) at the bottom
 }
 
 void repositionCursorTL(wBuf *wb) {
   wBufAppend(wb, CURSOR_TL, 3);
 }
 
+/* draw fn for entire editor */
 void drawRows(wBuf *wb) {
   int y;
   for (y = 0; y < cfg.rows - 1; y++) {
@@ -52,7 +55,35 @@ void drawRows(wBuf *wb) {
       int len = cfg.er[filerow].rsize - cfg.coloff;
       if (len < 0) len = 0;
       if (len > cfg.cols) len = cfg.cols;
-      wBufAppend(wb, &cfg.er[filerow].render[cfg.coloff], len);
+      char *c = &cfg.er[filerow].render[cfg.coloff];
+      unsigned char *hl = &cfg.er[filerow].hl[cfg.coloff];
+      char *curr_color = NULL;
+      int j;
+      for (j = 0; j < len; j++) {
+        if (iscntrl(c[j])) {
+          char sym = (c[j] <= 26) ? '@' + c[j] : '?';
+          wBufAppend(wb, "\x1b[7m", 4);
+          wBufAppend(wb, &sym, 1);
+          wBufAppend(wb, "\x1b[m", 3);
+          if (curr_color != NULL) {
+            wBufAppend(wb, curr_color, strlen(curr_color));
+          }
+        } else if (hl[j] == HL_NORMAL) {
+          if (curr_color != NULL) {
+            wBufAppend(wb, DEF_COLOR, 5);
+            curr_color = NULL;
+          }
+          wBufAppend(wb, &c[j], 1);
+        } else {
+          char *color = editorSyntaxToColor(hl[j]);
+          if (color != curr_color) {
+            curr_color = color;
+            wBufAppend(wb, color, strlen(color));
+          }
+          wBufAppend(wb, &c[j], 1);
+        }
+      }
+      wBufAppend(wb, DEF_COLOR, 5);
     }
 
     wBufAppend(wb, "\x1b[K", 3);
@@ -181,6 +212,9 @@ void moveCursor(int key) {
 void editorOpen(char *filename) {
   free(cfg.filename);
   cfg.filename = strdup(filename);
+
+  editorSetSyntaxHighlight();
+
   FILE *fp = fopen(filename, "r");
   if (!fp) die("fopen");
 
@@ -255,6 +289,7 @@ void editorSave() {
         editorSetStatusMsg("%d: bytes written to disk", len);
         return;
       }
+      editorSetSyntaxHighlight();
     }
     close(fd);
   }
