@@ -6,19 +6,19 @@
 char *getModeStr(void) {
   switch (cfg.mode) {
   case MODE_INSERT:
-    return "INSERT";
+    return "-- INSERT -- ";
     break;
   case MODE_COMMAND:
-    return "COMMAND";
+    return "-- COMMAND -- ";
     break;
   case MODE_VISUAL:
-    return "VISUAL";
+    return "-- VISUAL -- ";
     break;
   case MODE_NORMAL:
-    return "NORMAL";
+    return "-- NORMAL -- ";
     break;
   default:
-    return "NORMAL";
+    return "-- NORMAL -- ";
     break;
   }
 }

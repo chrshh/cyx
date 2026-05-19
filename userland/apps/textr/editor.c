@@ -165,7 +165,7 @@ void moveCursor(int key) {
 
   case 'l':
   case ARROW_RIGHT:
-    if (row && cfg.x < row->size) {
+    if (row && cfg.x < row->size - 1) {
       cfg.x++;
     }
     break;

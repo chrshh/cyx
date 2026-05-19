@@ -93,6 +93,11 @@ void handleNormalModeKey(int c) {
     cfg.mode = MODE_INSERT;
     break;
 
+  case 'a':
+    cfg.mode = MODE_INSERT;
+    cfg.x++;
+    break;
+
   case ':':
     cfg.mode = MODE_COMMAND;
     cfg.cmdline[0] = ':';
@@ -164,6 +169,7 @@ void handleInsertModeKey(int c) {
 
   case '\x1b':
     cfg.mode = MODE_NORMAL;
+    cfg.x--;
     break;
   default:
     editorInsertChar(c);

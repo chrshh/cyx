@@ -46,6 +46,8 @@ void execCommands() {
   if (cmds & QUIT) {
     editorQuit();
   }
+
+  cfg.mode = MODE_NORMAL;
 }
 
 void commandInsertChar(int c) {
