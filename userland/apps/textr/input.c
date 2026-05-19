@@ -95,6 +95,8 @@ void handleNormalModeKey(int c) {
 
   case ':':
     cfg.mode = MODE_COMMAND;
+    cfg.cmdline[0] = ':';
+    cfg.cmdline[1] = '\0';
     break;
 
   case 'v':
@@ -124,9 +126,19 @@ void handleCommandModeKey(int c) {
     exit(0);
     break;
 
+  case ENTER:
+    execCommands();
+    break;
+
+  case BACKSPACE:
+    commandDelChar(c);
+    break;
+
   case '\x1b':
     cfg.mode = MODE_NORMAL;
     break;
+  default:
+    commandInsertChar(c);
   }
 }
 
@@ -143,8 +155,7 @@ void handleInsertModeKey(int c) {
 
     /* QUIT  */
   case CTRL_KEY('q'):
-    clearScreen();
-    exit(0);
+    editorQuit();
     break;
 
   case BACKSPACE:

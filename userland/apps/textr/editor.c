@@ -19,6 +19,7 @@ void initEditor(EditorConfig *cfg) {
   cfg->filename = NULL;
   cfg->statusmsg[0] = '\0';
   cfg->statusmsg_time = 0;
+  cfg->cmdline[0] = '\0';
   if (getWindowSize(&cfg->rows, &cfg->cols) == -1) die("getWindowSize");
   cfg->rows -= 2;
 }
@@ -29,7 +30,7 @@ void repositionCursorTL(wBuf *wb) {
 
 void drawRows(wBuf *wb) {
   int y;
-  for (y = 0; y < cfg.rows; y++) {
+  for (y = 0; y < cfg.rows - 1; y++) {
     int filerow = y + cfg.rowoff;
     if (filerow >= cfg.numrows) {
       if (cfg.numrows == 0 && y == cfg.rows / 3) {
@@ -59,24 +60,55 @@ void drawRows(wBuf *wb) {
   }
 }
 
+void updateCursorType(wBuf *wb) {
+  switch (cfg.mode) {
+  case MODE_NORMAL:
+    wBufAppend(wb, CURSOR_BLOCK, 5);
+    break;
+  case MODE_COMMAND:
+    wBufAppend(wb, CURSOR_HIDE, 6);
+    break;
+  case MODE_INSERT:
+    wBufAppend(wb, CURSOR_BAR, 5);
+    break;
+  case MODE_VISUAL:
+    wBufAppend(wb, CURSOR_BLOCK, 5);
+    break;
+  default:
+    return;
+  }
+}
+
 void refreshScreen(void) {
   editorScroll();
   wBuf wb = initWBuf();
 
   wBufAppend(&wb, CURSOR_HIDE, 6);
-  wBufAppend(&wb, "\x1b[2J", 4);
+  wBufAppend(&wb, SCREEN_CLEAR, 4);
   repositionCursorTL(&wb);
-
   drawRows(&wb);
-  editorDrawStatusBar(&wb);
-  editorDrawMsgBar(&wb);
 
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (cfg.y - cfg.rowoff) + 1, (cfg.rx - cfg.coloff) + 1);
-  wBufAppend(&wb, buf, strlen(buf));
+  int n;
 
+  n = snprintf(buf, sizeof(buf), "\x1b[%d;1H", cfg.rows + 1);
+  wBufAppend(&wb, buf, n);
+  editorDrawStatusBar(&wb);
+
+  n = snprintf(buf, sizeof(buf), "\x1b[%d;1H", cfg.rows + 2);
+  wBufAppend(&wb, buf, n);
+  if (cfg.cmdline[0] != '\0') {
+    editorDrawCmdline(&wb);
+  } else {
+    editorDrawMsgBar(&wb);
+  }
+
+  n = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (cfg.y - cfg.rowoff) + 1, (cfg.rx - cfg.coloff) + 1);
+  wBufAppend(&wb, buf, n);
+
+  /* Enabled cursor and render cursor based on EDITOR MODE */
   wBufAppend(&wb, CURSOR_SHOW, 6);
-
+  updateCursorType(&wb);
   write(STDOUT_FILENO, wb.b, wb.len);
   wBFree(&wb);
 }
@@ -219,6 +251,7 @@ void editorSave() {
         close(fd);
         free(buf);
         cfg.dirty = false;
+        cfg.cmdline[0] = '\0';
         editorSetStatusMsg("%d: bytes written to disk", len);
         return;
       }
@@ -227,4 +260,9 @@ void editorSave() {
   }
   free(buf);
   editorSetStatusMsg("Failed to save. I/O error: %s", strerror(errno));
+}
+
+void editorQuit() {
+  clearScreen();
+  exit(0);
 }

@@ -8,6 +8,7 @@
 
 /* keys */
 #define CTRL_KEY(k) ((k) & 0x1f)
+#define ENTER '\r'
 
 #define LEADER " "
 
@@ -15,11 +16,18 @@
 #define CURSOR_TL "\x1b[H"
 #define CURSOR_HIDE "\x1b[?25l"
 #define CURSOR_SHOW "\x1b[?25h"
+#define CURSOR_BLOCK "\x1b[2 q"
+#define CURSOR_BAR "\x1b[6 q"
+#define CURSOR_RESET "\x1b[0 q"
 
 #define SCREEN_CLEAR "\x1b[2J"
 #define SCREEN_CLEAR_LINE "\x1b[K"
 
 #define TAB_STOP 8
+
+/* commands */
+#define SAVE (1 << 0)
+#define QUIT (1 << 1)
 
 /* global state */
 typedef enum {
@@ -49,8 +57,9 @@ typedef struct EditorConfig {
   erow *er;
   bool dirty;
   char *filename;
-  char statusmsg[8];
+  char statusmsg[80];
   time_t statusmsg_time;
+  char cmdline[80];
   struct termios orig_term;
 } EditorConfig;
 
@@ -88,6 +97,9 @@ void wBufAppend(wBuf *wb, const char *s, int len);
 void moveCursor(int key);
 void editorOpen(char *filename);
 void editorScroll(void);
+void updateCursorType(wBuf *wb);
+void editorQuit(void);
+void editorSave(void);
 
 /* rows.c */
 void editorInsertRow(int pos, char *s, size_t len);
@@ -97,7 +109,6 @@ int editorRowXtoRx(erow *er, int x);
 void editorRowInsertChar(erow *er, int pos, int c);
 void editorInsertChar(int c);
 char *editorRowsToStr(int *buflen);
-void editorSave();
 void editorRowDelChar(erow *er, int pos);
 void editorDelChar(void);
 void editorFreeRow(erow *er);
@@ -109,6 +120,13 @@ void editorDrawStatusBar(wBuf *wb);
 char *getModeStr(void);
 void editorSetStatusMsg(const char *fmt, ...);
 void editorDrawMsgBar(wBuf *wb);
+
+/* commands.c */
+int parseCommands(char *cmd, int len);
+void execCommands();
+void commandInsertChar(int c);
+void commandDelChar(int c);
+void editorDrawCmdline(wBuf *wb);
 
 enum editorKey {
   BACKSPACE = 127,

@@ -27,26 +27,42 @@ void editorDrawStatusBar(wBuf *wb) {
   wBufAppend(wb, "\x1b[7m", 4);
   char status[80], rstatus[80], mdstatus[20];
 
-  int mdlen = snprintf(mdstatus, sizeof(mdstatus), "%-10s", getModeStr());
+  int modelen = snprintf(
+      mdstatus,
+      sizeof(mdstatus),
+      "%-10s",
+      getModeStr());
 
-  int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
-                     cfg.filename ? cfg.filename : "[No Name]", cfg.numrows,
-                     cfg.dirty ? "*" : "");
-  int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", cfg.y + 1, cfg.numrows);
-  if (len > cfg.cols) len = cfg.cols;
-  wBufAppend(wb, mdstatus, mdlen);
-  wBufAppend(wb, status, len);
-  while (mdlen + len < cfg.cols) {
-    if (cfg.cols - len == rlen) {
-      wBufAppend(wb, rstatus, rlen);
-      break;
-    } else {
+  int statuslen = snprintf(
+      status,
+      sizeof(status),
+      "%.20s - %d lines %s",
+      cfg.filename ? cfg.filename : "[No Name]",
+      cfg.numrows,
+      cfg.dirty ? "*" : "");
 
-      wBufAppend(wb, " ", 1);
-      len++;
-    }
+  int rlen = snprintf(
+      rstatus,
+      sizeof(rstatus),
+      "%d/%d",
+      cfg.y + 1,
+      cfg.numrows);
+
+  if (modelen > cfg.cols) modelen = cfg.cols;
+  if (modelen + statuslen > cfg.cols) statuslen = cfg.cols - modelen;
+  if (modelen + statuslen + rlen > cfg.cols) rlen = cfg.cols - modelen - statuslen;
+  if (statuslen < 0) statuslen = 0;
+  if (rlen < 0) rlen = 0;
+
+  wBufAppend(wb, mdstatus, modelen);
+  wBufAppend(wb, status, statuslen);
+
+  int written = modelen + statuslen;
+  while (written < cfg.cols - rlen) {
+    wBufAppend(wb, " ", 1);
+    written++;
   }
-  wBufAppend(wb, "\r\n", 2);
+  wBufAppend(wb, rstatus, rlen);
   wBufAppend(wb, "\x1b[m", 3);
 }
 
