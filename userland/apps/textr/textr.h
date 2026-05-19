@@ -28,6 +28,7 @@
 /* commands */
 #define SAVE (1 << 0)
 #define QUIT (1 << 1)
+#define FORCE (1 << 2)
 
 /* colors */
 #define BLUE "\x1b[94m"
@@ -134,8 +135,9 @@ void moveCursor(int key);
 void editorOpen(char *filename);
 void editorScroll(void);
 void updateCursorType(wBuf *wb);
-void editorQuit(void);
+void editorQuit(bool force);
 void editorSave(void);
+int editorTouchFile(char *filename);
 
 /* rows.c */
 void editorInsertRow(int pos, char *s, size_t len);

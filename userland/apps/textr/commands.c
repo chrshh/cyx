@@ -17,6 +17,9 @@ int parseCommands(char *cmd, int len) {
     case 'q':
       cmds |= QUIT;
       break;
+    case '!':
+      cmds |= FORCE;
+      break;
     default:
       return -1;
       break;
@@ -31,6 +34,7 @@ void execCommands() {
   int len = strlen(cmd);
 
   int cmds = parseCommands(cmd, len);
+  bool force = false;
 
   if (cmds == -1) {
     // TODO: unknown cmd
@@ -44,7 +48,12 @@ void execCommands() {
     editorSave();
   }
   if (cmds & QUIT) {
-    editorQuit();
+    if (cmds & FORCE) {
+      force = true;
+      editorQuit(force);
+    } else {
+      editorQuit(force);
+    }
   }
 
   cfg.mode = MODE_NORMAL;
@@ -52,6 +61,9 @@ void execCommands() {
 
 void commandInsertChar(int c) {
   int n = strlen(cfg.cmdline);
+  if (n >= 80) {
+    return;
+  }
   cfg.cmdline[n] = c;
   cfg.cmdline[n + 1] = '\0';
   return;

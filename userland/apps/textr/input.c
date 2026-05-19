@@ -64,8 +64,7 @@ void handleNormalModeKey(int c) {
 
   /* QUIT  */
   case CTRL_KEY('q'):
-    clearScreen();
-    exit(0);
+    editorQuit(false);
     break;
 
   case CTRL_KEY('s'):
@@ -82,7 +81,9 @@ void handleNormalModeKey(int c) {
 
   case '$': {
     erow *row = (cfg.y >= cfg.numrows) ? NULL : &cfg.er[cfg.y];
-    cfg.x = strlen(row->chars) - 1;
+    if (row && row->size > 0) {
+      cfg.x = strlen(row->chars) - 1;
+    }
   } break;
 
   case '^':
@@ -160,7 +161,7 @@ void handleInsertModeKey(int c) {
 
     /* QUIT  */
   case CTRL_KEY('q'):
-    editorQuit();
+    editorQuit(false);
     break;
 
   case BACKSPACE:

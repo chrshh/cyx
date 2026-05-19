@@ -209,6 +209,17 @@ void moveCursor(int key) {
   }
 }
 
+int editorTouchFile(char *filename) {
+  int fd = open(filename, O_CREAT | O_WRONLY, 0644);
+  if (fd == -1) {
+    perror(filename);
+    return 1;
+  }
+
+  close(fd);
+  return 0;
+}
+
 void editorOpen(char *filename) {
   free(cfg.filename);
   cfg.filename = strdup(filename);
@@ -216,7 +227,13 @@ void editorOpen(char *filename) {
   editorSetSyntaxHighlight();
 
   FILE *fp = fopen(filename, "r");
-  if (!fp) die("fopen");
+  if (!fp) {
+    int ok = editorTouchFile(filename);
+    if (ok != 0) {
+      die("open & create");
+    }
+    fp = fopen(filename, "r");
+  }
 
   char *line = NULL;
   size_t linecap = 0;
@@ -287,6 +304,7 @@ void editorSave() {
         cfg.dirty = false;
         cfg.cmdline[0] = '\0';
         editorSetStatusMsg("%d: bytes written to disk", len);
+        editorSetSyntaxHighlight();
         return;
       }
       editorSetSyntaxHighlight();
@@ -297,7 +315,23 @@ void editorSave() {
   editorSetStatusMsg("Failed to save. I/O error: %s", strerror(errno));
 }
 
-void editorQuit() {
-  clearScreen();
-  exit(0);
+void editorQuit(bool force) {
+  if (force) {
+    clearScreen();
+    exit(0);
+  } else {
+    if (cfg.dirty) {
+      char buf[80];
+      int n = snprintf(buf, sizeof(buf), "%s has unsaved changes. '!q' to quit without saving", cfg.filename);
+      int i = 0;
+      cfg.cmdline[0] = '\0';
+      while (buf[i] != '\0') {
+        commandInsertChar(buf[i]);
+        i++;
+      }
+    } else {
+      clearScreen();
+      exit(0);
+    }
+  }
 }
