@@ -179,12 +179,24 @@ int   is_separator(int c);
 int   is_operator(int c);
 void  editorSetSyntaxHighlight(void);
 
-/* motionfns.c */
+/*
+ *
+ * motionfns.c
+ *
+ */
+
+/* words */
 Pos motionWordForward(void);
 Pos motionWordForwardBig(void);
 Pos motionWordEnd(void);
 Pos motionWordEndBig(void);
 Pos motionWordBackwards(void);
+Pos motionWordBackwardsBig(void);
+
+/* lines */
+Pos motionLineLastChar(void);
+
+/* actions */
 Pos actionInsertLineBelowCursor(void);
 Pos actionInsertLineAboveCursor(void);
 

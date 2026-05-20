@@ -98,6 +98,10 @@ void handleNormalModeKey(int c) {
     }
 
     case '$': {
+        Pos target = motionLineLastChar();
+        cfg.x      = target.x;
+        cfg.y      = target.y;
+        break;
         erow *row = (cfg.y >= cfg.numrows) ? NULL : &cfg.er[cfg.y];
         if (row && row->size > 0) { cfg.x = strlen(row->chars) - 1; }
     } break;
@@ -144,8 +148,21 @@ void handleNormalModeKey(int c) {
         Pos target = motionWordEndBig();
         cfg.x      = target.x;
         cfg.y      = target.y;
+        break;
     }
-    // case 'b': motionWordBackwards(row); break;
+
+    case 'b': {
+        Pos target = motionWordBackwards();
+        cfg.x      = target.x;
+        cfg.y      = target.y;
+        break;
+    }
+
+    case 'B': {
+        Pos target = motionWordBackwardsBig();
+        cfg.x      = target.x;
+        cfg.y      = target.y;
+    }
 
     /* BASIC MOTIONS */
     case 'h':

@@ -1,7 +1,10 @@
 #include "textr.h"
+#include <string.h>
 
 /*
- * helper functions for determining how to move cursor for motions
+ *
+ * helper fns
+ *
  */
 static int isWordChar(int c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
@@ -15,7 +18,11 @@ static int charType(int c) {
     return TYPE_PUNCT;
 }
 
-/* normal mode  */
+/*
+ *
+ * normal mode
+ *
+ */
 
 /* -- w -- */
 Pos motionWordForward(void) {
@@ -75,8 +82,80 @@ Pos motionWordForwardBig(void) {
     }
 }
 
-// Pos motionWordBackwards(void) {
-// }
+/* -- b -- */
+Pos motionWordBackwards(void) {
+    Pos p = { cfg.x, cfg.y };
+    if (p.y >= cfg.numrows) return p;
+    erow *row = &cfg.er[p.y];
+
+    p.x--;
+    if (p.x < 0) {
+        if (p.y == 0) return p;
+        p.y--;
+        row = &cfg.er[p.y];
+        p.x = row->size ? row->size - 1 : 0;
+        if (row->size == 0) return p;
+    }
+
+    while (1) {
+        if (p.x < 0) {
+            if (p.y == 0) {
+                p.x = 0;
+                return p;
+            }
+            p.y--;
+            row = &cfg.er[p.y];
+            p.x = row->size > 0 ? row->size - 1 : 0;
+            if (row->size == 0) return p;
+            continue;
+        }
+        if (charType(row->chars[p.x]) != TYPE_SPACE) break;
+        p.x--;
+    }
+
+    int run_type = charType(row->chars[p.x]);
+    while (p.x > 0 && charType(row->chars[p.x - 1]) == run_type) {
+        p.x--;
+    }
+    return p;
+}
+
+/* -- B -- */
+Pos motionWordBackwardsBig(void) {
+    Pos p = { cfg.x, cfg.y };
+    if (p.y >= cfg.numrows) return p;
+    erow *row = &cfg.er[p.y];
+
+    p.x--;
+    if (p.x < 0) {
+        if (p.y == 0) return p;
+        p.y--;
+        row = &cfg.er[p.y];
+        p.x = row->size ? row->size - 1 : 0;
+        if (row->size == 0) return p;
+    }
+
+    while (1) {
+        if (p.x < 0) {
+            if (p.y == 0) {
+                p.x = 0;
+                return p;
+            }
+            p.y--;
+            row = &cfg.er[p.y];
+            p.x = row->size > 0 ? row->size - 1 : 0;
+            if (row->size == 0) return p;
+            continue;
+        }
+        if (charType(row->chars[p.x]) != TYPE_SPACE) break;
+        p.x--;
+    }
+
+    while (p.x > 0 && charType(row->chars[p.x - 1]) != TYPE_SPACE) {
+        p.x--;
+    }
+    return p;
+}
 
 /* -- e --  */
 Pos motionWordEnd(void) {
@@ -150,7 +229,6 @@ Pos motionWordEndBig(void) {
         if (charType(row->chars[p.x]) != TYPE_SPACE) break;
         p.x++;
     }
-    int run_type = charType(row->chars[p.x]);
     while (p.x < row->size && charType(row->chars[p.x]) != TYPE_SPACE) {
         p.x++;
     }
@@ -158,7 +236,19 @@ Pos motionWordEndBig(void) {
     return p;
 }
 
-/* insert mode */
+/* -- $ -- */
+Pos motionLineLastChar(void) {
+    Pos   p   = { cfg.x, cfg.y };
+    erow *row = (p.y >= cfg.numrows) ? NULL : &cfg.er[p.y];
+    if (row && row->size > 0) { p.x = strlen(row->chars) - 1; }
+    return p;
+}
+
+/*
+ *
+ * insert mode
+ *
+ */
 
 /* -- o -- */
 Pos actionInsertLineBelowCursor(void) {
