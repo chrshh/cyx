@@ -183,6 +183,8 @@ void  editorSetSyntaxHighlight(void);
 Pos motionWordForward(void);
 Pos motionWordEnd(void);
 Pos motionWordBackwards(void);
+Pos actionInsertLineBelowCursor(void);
+Pos actionInsertLineAboveCursor(void);
 
 /* search.c */
 void editorFind(void);

@@ -68,7 +68,7 @@ void editorFind() {
         free(query);
     } else {
         cfg.x      = saved_x;
-        cfg.y      = saved_x;
+        cfg.y      = saved_y;
         cfg.coloff = saved_coloff;
         cfg.rowoff = saved_rowoff;
     }

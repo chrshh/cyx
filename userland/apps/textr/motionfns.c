@@ -15,6 +15,8 @@ static int charType(int c) {
     return TYPE_PUNCT;
 }
 
+/* normal mode  */
+
 /* -- w -- */
 Pos motionWordForward(void) {
     Pos p = { cfg.x, cfg.y };
@@ -50,3 +52,45 @@ Pos motionWordForward(void) {
 //
 // Pos motionWordEnd(void) {
 // }
+
+/* insert mode */
+
+/* -- o -- */
+Pos actionInsertLineBelowCursor(void) {
+    erow *row = &cfg.er[cfg.y];
+
+    int indent = 0;
+    while (indent < row->size && (row->chars[indent] == ' ' || row->chars[indent] == '\t')) {
+        indent++;
+    }
+
+    cfg.x = row->size;
+    editorInsertNewLine();
+
+    for (int i = 0; i < indent; i++) {
+        editorInsertChar(' ');
+    }
+    Pos pos = { cfg.x, cfg.y };
+    return pos;
+}
+
+/* -- O -- */
+Pos actionInsertLineAboveCursor(void) {
+    erow *row = &cfg.er[cfg.y];
+
+    int indent = 0;
+    while (indent < row->size && (row->chars[indent] == ' ' || row->chars[indent] == '\t')) {
+        indent++;
+    }
+
+    cfg.x = 0;
+    editorInsertNewLine();
+    cfg.y--;
+
+    for (int i = 0; i < indent; i++) {
+        editorInsertChar(' ');
+    }
+
+    Pos pos = { cfg.x, cfg.y };
+    return pos;
+}

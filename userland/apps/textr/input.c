@@ -53,13 +53,33 @@ void handleNormalModeKey(int c) {
 
     switch (c) {
     /* QUIT  */
-    case CTRL_KEY('q'): editorQuit(false); break;
+    case CTRL_KEY('q'):
+        clearScreen();
+        exit(0);
+        editorQuit(false);
+        break;
 
     case CTRL_KEY('s'): editorSave(); break;
 
     case LEADER: handleLeaderKeyBind(); break;
 
     case '/': editorFind(); break;
+
+    case 'o': {
+        Pos target = actionInsertLineBelowCursor();
+        cfg.x      = target.x;
+        cfg.y      = target.y;
+        cfg.mode   = MODE_INSERT;
+        break;
+    }
+
+    case 'O': {
+        Pos target = actionInsertLineAboveCursor();
+        cfg.x      = target.x;
+        cfg.y      = target.y;
+        cfg.mode   = MODE_INSERT;
+        break;
+    }
 
     /* COMPLEX MOTIONS */
     case 'G': {
