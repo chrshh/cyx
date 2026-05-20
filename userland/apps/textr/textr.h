@@ -38,6 +38,7 @@
 #define DEF_COLOR "\x1b[39m"
 #define COMMENT   "\x1b[90m"
 #define MLCOMMENT "\x1b[90m"
+#define MATCH     "\x1b[35m"
 #define OPERATOR  BLUE
 
 /* global state */
@@ -52,6 +53,7 @@ typedef enum {
     HL_KEYWORD1,
     HL_KEYWORD2,
     HL_OPERATOR,
+    HL_MATCH
 } EditorHighlight;
 
 typedef struct {
@@ -126,26 +128,28 @@ void handleNormalModeKey(int c);
 void handleLeaderKeyBind(void);
 
 /* editor.c */
-void refreshScreen(void);
-void clearScreen(void);
-void drawRows(wBuf *wb);
-void initEditor(EditorConfig *cfg);
-wBuf initWBuf(void);
-void wBFree(wBuf *wb);
-void wBufAppend(wBuf *wb, const char *s, int len);
-void moveCursor(int key);
-void editorOpen(char *filename);
-void editorScroll(void);
-void updateCursorType(wBuf *wb);
-void editorQuit(bool force);
-void editorSave(void);
-int  editorTouchFile(char *filename);
+void  refreshScreen(void);
+void  clearScreen(void);
+void  drawRows(wBuf *wb);
+void  initEditor(EditorConfig *cfg);
+wBuf  initWBuf(void);
+void  wBFree(wBuf *wb);
+void  wBufAppend(wBuf *wb, const char *s, int len);
+void  moveCursor(int key);
+void  editorOpen(char *filename);
+void  editorScroll(void);
+void  updateCursorType(wBuf *wb);
+void  editorQuit(bool force);
+void  editorSave(void);
+int   editorTouchFile(char *filename);
+char *editorPrompt(char *prompt, void (*callback)(char *, int));
 
 /* rows.c */
 void  editorInsertRow(int pos, char *s, size_t len);
 void  editorInsertNewLine();
 void  editorUpdateRow(erow *er);
 int   editorRowXtoRx(erow *er, int x);
+int   editorRowRxToX(erow *er, int rx);
 void  editorRowInsertChar(erow *er, int pos, int c);
 void  editorInsertChar(int c);
 char *editorRowsToStr(int *buflen);
@@ -179,6 +183,10 @@ void  editorSetSyntaxHighlight(void);
 Pos motionWordForward(void);
 Pos motionWordEnd(void);
 Pos motionWordBackwards(void);
+
+/* search.c */
+void editorFind(void);
+void editorFindCallback(char *query, int key);
 
 enum editorKey { BACKSPACE = 127, ARROW_LEFT = 1000, ARROW_RIGHT, ARROW_UP, ARROW_DOWN };
 

@@ -59,6 +59,8 @@ void handleNormalModeKey(int c) {
 
     case LEADER: handleLeaderKeyBind(); break;
 
+    case '/': editorFind(); break;
+
     /* COMPLEX MOTIONS */
     case 'G': {
         int scrl_down = cfg.numrows;
@@ -130,7 +132,10 @@ void handleCommandModeKey(int c) {
 
     case BACKSPACE: commandDelChar(); break;
 
-    case '\x1b': cfg.mode = MODE_NORMAL; break;
+    case '\x1b':
+        cfg.mode       = MODE_NORMAL;
+        cfg.cmdline[0] = '\0';
+        break;
     default: commandInsertChar(c);
     }
 }
