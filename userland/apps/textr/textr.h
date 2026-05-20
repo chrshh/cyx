@@ -181,7 +181,9 @@ void  editorSetSyntaxHighlight(void);
 
 /* motionfns.c */
 Pos motionWordForward(void);
+Pos motionWordForwardBig(void);
 Pos motionWordEnd(void);
+Pos motionWordEndBig(void);
 Pos motionWordBackwards(void);
 Pos actionInsertLineBelowCursor(void);
 Pos actionInsertLineAboveCursor(void);

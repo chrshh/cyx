@@ -125,7 +125,26 @@ void handleNormalModeKey(int c) {
         cfg.y      = target.y;
         break;
     }
-    // case 'e': motionWordEnd(row); break;
+
+    case 'W': {
+        Pos target = motionWordForwardBig();
+        cfg.x      = target.x;
+        cfg.y      = target.y;
+        break;
+    }
+
+    case 'e': {
+        Pos target = motionWordEnd();
+        cfg.x      = target.x;
+        cfg.y      = target.y;
+        break;
+    }
+
+    case 'E': {
+        Pos target = motionWordEndBig();
+        cfg.x      = target.x;
+        cfg.y      = target.y;
+    }
     // case 'b': motionWordBackwards(row); break;
 
     /* BASIC MOTIONS */
