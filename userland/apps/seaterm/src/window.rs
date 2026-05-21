@@ -21,6 +21,10 @@ use wayland_client::{
     protocol::{wl_output, wl_shm, wl_surface},
 };
 
+use crate::font::FontCache;
+use crate::grid::Grid;
+use crate::render;
+
 pub struct State {
     registry_state: RegistryState,
     output_state: OutputState,
@@ -34,6 +38,9 @@ pub struct State {
     height: u32,
     running: bool,
     first_configure: bool,
+
+    font: FontCache,
+    grid: Grid,
 }
 
 pub fn run() {
@@ -51,6 +58,21 @@ pub fn run() {
     let shm = Shm::bind(&globals, &qh).expect("wl_shm not available");
     let pool = SlotPool::new(256 * 256 * 4, &shm).expect("failed to create slot pool");
 
+    let font = FontCache::new(16.0);
+    let init_cols = 80;
+    let init_rows = 24;
+    let grid = {
+        let mut g = Grid::new(init_cols, init_rows);
+        g.write_str(0, 0, "seaterm");
+        g.write_str(0, 1, "press anything (no input yet)");
+        g.write_str(0, 3, "the quick brown fox jumps over the lazy dog");
+        g.write_str(0, 4, "0123456789  !@#$%^&*()  []{}<>  =>  ->  ::");
+        g
+    };
+
+    let init_w = (init_cols * font.cell_w) as u32;
+    let init_h = (init_rows * font.cell_h) as u32;
+
     let surface = compositor_state.create_surface(&qh);
     let window = xdg_shell.create_window(surface, WindowDecorations::RequestServer, &qh);
 
@@ -67,11 +89,13 @@ pub fn run() {
         xdg_shell,
         shm,
         pool,
-        width: 800,
-        height: 600,
+        width: init_w,
+        height: init_h,
         window,
         running: true,
         first_configure: true,
+        font,
+        grid,
     };
 
     while state.running {
@@ -85,19 +109,33 @@ impl State {
         let height = self.height as i32;
         let stride = width * 4;
 
+        // Resize grid to match current window size in cells.
+        let cols = (width as usize / self.font.cell_w).max(1);
+        let rows = (height as usize / self.font.cell_h).max(1);
+        if cols != self.grid.cols || rows != self.grid.rows {
+            // Keep the demo strings on resize.
+            self.grid.resize(cols, rows);
+            self.grid.write_str(0, 0, "seaterm");
+            self.grid.write_str(0, 1, "press anything (no input yet)");
+            self.grid
+                .write_str(0, 3, "the quick brown fox jumps over the lazy dog");
+            self.grid
+                .write_str(0, 4, "0123456789  !@#$%^&*()  []{}<>  =>  ->  ::");
+        }
+
         let (buffer, canvas) = self
             .pool
             .create_buffer(width, height, stride, wl_shm::Format::Argb8888)
             .expect("failed to create buffer");
 
-        // Fill with a dark gray — classic terminal background.
-        // Format is ARGB8888 but little-endian, so bytes are [B, G, R, A].
-        for pixel in canvas.chunks_exact_mut(4) {
-            pixel[0] = 0x1e; // B
-            pixel[1] = 0x1e; // G
-            pixel[2] = 0x1e; // R
-            pixel[3] = 0xff; // A
-        }
+        render::paint(
+            canvas,
+            width as usize,
+            height as usize,
+            stride as usize,
+            &self.grid,
+            &mut self.font,
+        );
 
         let surface = self.window.wl_surface();
         surface.damage_buffer(0, 0, width, height);
@@ -105,7 +143,6 @@ impl State {
         surface.commit();
     }
 }
-
 impl CompositorHandler for State {
     fn scale_factor_changed(
         &mut self,
