@@ -1,3 +1,0 @@
-wayland_client::Dispatch<wayland_client::protocol::wl_callback::WlCallback, wayland_client::protocol::wl_surface::WlSurface, D>
-wayland_client::Dispatch<wayland_client::protocol::wl_compositor::WlCompositor, smithay_client_toolkit::globals::GlobalData, D>
-wayland_client::Dispatch<wayland_client::protocol::wl_surface::WlSurface, smithay_client_toolkit::compositor::SurfaceData, window::State>

@@ -1,1 +1,0 @@
-window::State: wayland_client::Dispatch<wayland_client::protocol::wl_compositor::WlCompositor, smithay_client_toolkit::globals::GlobalData>

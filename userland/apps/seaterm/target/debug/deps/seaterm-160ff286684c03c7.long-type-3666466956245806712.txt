@@ -1,2 +1,0 @@
-smithay_client_toolkit::reexports::wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase
-window::State: wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase, smithay_client_toolkit::globals::GlobalData>
