@@ -1,0 +1,2 @@
+smithay_client_toolkit::reexports::wayland_protocols::xdg::decoration::zv1::client::zxdg_decoration_manager_v1::ZxdgDecorationManagerV1
+window::State: wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::decoration::zv1::client::zxdg_decoration_manager_v1::ZxdgDecorationManagerV1, smithay_client_toolkit::globals::GlobalData>

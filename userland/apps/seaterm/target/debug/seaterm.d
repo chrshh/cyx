@@ -1,0 +1,1 @@
+/home/chris/repositories/cjyx/userland/apps/seaterm/target/debug/seaterm: /home/chris/repositories/cjyx/userland/apps/seaterm/src/main.rs /home/chris/repositories/cjyx/userland/apps/seaterm/src/window.rs

@@ -1,0 +1,1 @@
+window::State: wayland_client::Dispatch<wayland_client::protocol::wl_shm::WlShm, smithay_client_toolkit::globals::GlobalData>

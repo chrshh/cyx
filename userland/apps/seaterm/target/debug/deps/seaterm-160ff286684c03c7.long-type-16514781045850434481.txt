@@ -1,0 +1,11 @@
+window::State: wayland_client::Dispatch<wayland_client::protocol::wl_output::WlOutput, smithay_client_toolkit::output::OutputData>
+wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::decoration::zv1::client::zxdg_decoration_manager_v1::ZxdgDecorationManagerV1, smithay_client_toolkit::globals::GlobalData>
+wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::decoration::zv1::client::zxdg_toplevel_decoration_v1::ZxdgToplevelDecorationV1, smithay_client_toolkit::shell::xdg::window::WindowData>
+wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface, smithay_client_toolkit::shell::xdg::window::WindowData>
+wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel, smithay_client_toolkit::shell::xdg::window::WindowData>
+wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase, smithay_client_toolkit::globals::GlobalData>
+wayland_client::Dispatch<wayland_client::protocol::wl_callback::WlCallback, wayland_client::protocol::wl_surface::WlSurface>
+wayland_client::Dispatch<wayland_client::protocol::wl_compositor::WlCompositor, smithay_client_toolkit::globals::GlobalData>
+wayland_client::Dispatch<wayland_client::protocol::wl_registry::WlRegistry, wayland_client::globals::GlobalListContents>
+wayland_client::Dispatch<wayland_client::protocol::wl_shm::WlShm, smithay_client_toolkit::globals::GlobalData>
+wayland_client::Dispatch<wayland_client::protocol::wl_surface::WlSurface, smithay_client_toolkit::compositor::SurfaceData>

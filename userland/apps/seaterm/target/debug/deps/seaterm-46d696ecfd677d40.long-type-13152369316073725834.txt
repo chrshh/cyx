@@ -1,0 +1,2 @@
+smithay_client_toolkit::reexports::wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel
+window::State: wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel, smithay_client_toolkit::shell::xdg::window::WindowData>

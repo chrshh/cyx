@@ -1,0 +1,6 @@
+wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_manager_v1::ZxdgOutputManagerV1, smithay_client_toolkit::globals::GlobalData, D>
+wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_v1::ZxdgOutputV1, smithay_client_toolkit::output::OutputData, D>
+wayland_client::Dispatch<wayland_client::protocol::wl_output::WlOutput, smithay_client_toolkit::output::OutputData, D>
+wayland_client::Dispatch<wayland_client::protocol::wl_output::WlOutput, smithay_client_toolkit::output::OutputData, window::State>
+wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_manager_v1::ZxdgOutputManagerV1, smithay_client_toolkit::globals::GlobalData, window::State>
+wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_v1::ZxdgOutputV1, smithay_client_toolkit::output::OutputData, window::State>

@@ -1,0 +1,2 @@
+smithay_client_toolkit::reexports::wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface
+window::State: wayland_client::Dispatch<smithay_client_toolkit::reexports::wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface, smithay_client_toolkit::shell::xdg::window::WindowData>
