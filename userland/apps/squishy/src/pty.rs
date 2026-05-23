@@ -24,7 +24,7 @@ pub struct Pty {
     pub rows: u16,
 }
 
-// Create a new TTY, PTY
+// Tha TTY, PTY
 pub fn new(cols: u16, rows: u16) -> io::Result<Pty> {
     let pty = openpty(None, None)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("openpty: {e}")))?;
