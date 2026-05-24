@@ -48,11 +48,32 @@ impl<'a> vte::Perform for Performer<'a> {
     fn csi_dispatch(
         &mut self,
         params: &vte::Params,
-        _intermediates: &[u8],
+        intermediates: &[u8],
         ignore: bool,
         action: char,
     ) {
         if ignore {
+            return;
+        }
+
+        if intermediates == b"?" {
+            let code = params.iter().next().map(|p| p[0]).unwrap_or(0);
+            match (code, action) {
+                (1049, 'h') => {
+                    self.grid.enter_alt(self.cursor.col, self.cursor.row);
+                    self.cursor.col = 0;
+                    self.cursor.row = 0;
+                    self.cursor.cell = Cell::default();
+                }
+                (1049, 'l') => {
+                    if let Some((col, row)) = self.grid.exit_alt() {
+                        self.cursor.col = col;
+                        self.cursor.row = row;
+                        self.cursor.cell = Cell::default();
+                    }
+                }
+                _ => {}
+            }
             return;
         }
 

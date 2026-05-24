@@ -1,3 +1,5 @@
+use std::mem;
+
 #[derive(Copy, Clone, Debug)]
 pub struct Cell {
     pub ch: char,
@@ -28,6 +30,8 @@ pub struct Grid {
     pub cols: usize,
     pub rows: usize,
     pub cells: Vec<Cell>,
+    pub alt_cells: Option<Vec<Cell>>,
+    pub saved_cursor: Option<(usize, usize)>,
 }
 
 impl Grid {
@@ -36,6 +40,8 @@ impl Grid {
             cols,
             rows,
             cells: vec![Cell::default(); cols * rows],
+            alt_cells: None,
+            saved_cursor: None,
         }
     }
 
@@ -70,5 +76,22 @@ impl Grid {
         for cell in &mut self.cells[last_start..] {
             *cell = Cell::default();
         }
+    }
+
+    pub fn enter_alt(&mut self, cursor_col: usize, cursor_row: usize) {
+        if self.alt_cells.is_some() {
+            return; // on alt screen
+        }
+
+        let blank = vec![Cell::default(); self.cols * self.rows];
+        let main = mem::replace(&mut self.cells, blank);
+        self.alt_cells = Some(main);
+        self.saved_cursor = Some((cursor_col, cursor_row));
+    }
+
+    pub fn exit_alt(&mut self) -> Option<(usize, usize)> {
+        let main = self.alt_cells.take()?;
+        self.cells = main;
+        self.saved_cursor.take()
     }
 }
