@@ -1,5 +1,6 @@
 use crate::font::FontCache;
 use crate::grid::Grid;
+use crate::parser::Cursor;
 
 /// Buffer layout: little-endian ARGB8888, so bytes are [B, G, R, A] per pixel,
 pub fn paint(
@@ -9,6 +10,7 @@ pub fn paint(
     stride: usize,
     grid: &Grid,
     font: &mut FontCache,
+    cursor: &Cursor,
 ) {
     let bg = grid.cells.first().map(|c| c.bg).unwrap_or([0x1e; 3]);
     for y in 0..buf_h {
@@ -69,6 +71,24 @@ pub fn paint(
                     buf[off + 2] = r as u8;
                     buf[off + 3] = 0xff;
                 }
+            }
+        }
+    }
+
+    // draw cursor
+    if cursor.col < grid.cols && cursor.row < grid.rows {
+        let cursor_x = cursor.col * cell_w;
+        let cursor_y = cursor.row * cell_h;
+        let bar_w = 2usize;
+        let bar_color = [0xff, 0xff, 0xff]; // white, RGB
+
+        for y in cursor_y..(cursor_y + cell_h).min(buf_h) {
+            for x in cursor_x..(cursor_x + bar_w).min(buf_w) {
+                let off = y * stride + x * 4;
+                buf[off] = bar_color[2]; // B
+                buf[off + 1] = bar_color[1]; // G
+                buf[off + 2] = bar_color[0]; // R
+                buf[off + 3] = 0xff;
             }
         }
     }

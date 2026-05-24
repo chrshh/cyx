@@ -1,10 +1,11 @@
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
-    delegate_compositor, delegate_output, delegate_registry, delegate_shm, delegate_xdg_shell,
-    delegate_xdg_window,
+    delegate_compositor, delegate_keyboard, delegate_output, delegate_registry, delegate_seat,
+    delegate_shm, delegate_xdg_shell, delegate_xdg_window,
     output::{OutputHandler, OutputState},
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
+    seat::{Capability, SeatHandler, SeatState, keyboard::KeyboardHandler},
     shell::{
         WaylandSurface,
         xdg::{
@@ -18,7 +19,10 @@ use smithay_client_toolkit::{
 use wayland_client::{
     Connection, QueueHandle,
     globals::registry_queue_init,
-    protocol::{wl_output, wl_shm, wl_surface},
+    protocol::{
+        wl_keyboard::{self, WlKeyboard},
+        wl_output, wl_seat, wl_shm, wl_surface,
+    },
 };
 
 use crate::grid::Grid;
@@ -28,7 +32,7 @@ use crate::render;
 use crate::{font::FontCache, grid::Cell};
 use calloop::{EventLoop, Interest, LoopHandle, Mode, PostAction, generic::Generic};
 use calloop_wayland_source::WaylandSource;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::os::fd::AsFd;
 
 pub struct State {
@@ -52,6 +56,9 @@ pub struct State {
     parser: vte::Parser,
     cursor: Cursor,
     needs_redraw: bool,
+
+    seat_state: SeatState,
+    keyboard: Option<wl_keyboard::WlKeyboard>,
 }
 
 pub fn run() {
@@ -105,6 +112,8 @@ pub fn run() {
             cell: Cell::default(),
         },
         needs_redraw: false,
+        seat_state: SeatState::new(&globals, &qh),
+        keyboard: None,
     };
 
     let mut event_loop: EventLoop<State> = EventLoop::try_new().expect("calloop");
@@ -195,6 +204,7 @@ impl State {
             stride as usize,
             &self.grid,
             &mut self.font,
+            &self.cursor,
         );
 
         let surface = self.window.wl_surface();
@@ -300,11 +310,134 @@ impl ProvidesRegistryState for State {
     fn registry(&mut self) -> &mut RegistryState {
         &mut self.registry_state
     }
-    registry_handlers![OutputState];
+    registry_handlers![OutputState, SeatState];
 }
+
+impl SeatHandler for State {
+    fn seat_state(&mut self) -> &mut SeatState {
+        &mut self.seat_state
+    }
+
+    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+
+    fn new_capability(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        seat: wl_seat::WlSeat,
+        capability: Capability,
+    ) {
+        if capability == Capability::Keyboard && self.keyboard.is_none() {
+            let kb = self
+                .seat_state
+                .get_keyboard(qh, &seat, None)
+                .expect("failed to create keyboard");
+            self.keyboard = Some(kb);
+        }
+    }
+
+    fn remove_capability(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: wl_seat::WlSeat,
+        capability: Capability,
+    ) {
+        if capability == Capability::Keyboard {
+            if let Some(kb) = self.keyboard.take() {
+                kb.release();
+            }
+        }
+    }
+
+    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+}
+
+impl KeyboardHandler for State {
+    fn enter(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wl_keyboard::WlKeyboard,
+        _surface: &wl_surface::WlSurface,
+        _serial: u32,
+        _raw: &[u32],
+        _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
+    ) {
+        println!("fn enter");
+    }
+
+    fn leave(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wl_keyboard::WlKeyboard,
+        _surface: &wl_surface::WlSurface,
+
+        _serial: u32,
+    ) {
+        println!("fn leave");
+    }
+
+    fn press_key(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+
+        _keyboard: &wl_keyboard::WlKeyboard,
+        _serial: u32,
+
+        event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+    ) {
+        if let Some(text) = &event.utf8 {
+            let _ = self.pty.file.write(text.as_bytes());
+        }
+        self.needs_redraw = true;
+    }
+
+    fn release_key(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wl_keyboard::WlKeyboard,
+        _serial: u32,
+
+        _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+    ) {
+        println!("fn release_key");
+        self.needs_redraw = true;
+    }
+
+    fn update_modifiers(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wl_keyboard::WlKeyboard,
+        _serial: u32,
+        _modifiers: smithay_client_toolkit::seat::keyboard::Modifiers,
+        _raw_modifiers: smithay_client_toolkit::seat::keyboard::RawModifiers,
+        _layout: u32,
+    ) {
+        println!("fn update_modifiers");
+    }
+
+    fn repeat_key(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &wl_keyboard::WlKeyboard,
+        _serial: u32,
+        _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+    ) {
+        println!("fn repeat_key");
+    }
+}
+
 delegate_compositor!(State);
 delegate_xdg_shell!(State);
 delegate_xdg_window!(State);
 delegate_shm!(State);
 delegate_registry!(State);
 delegate_output!(State);
+delegate_keyboard!(State);
+delegate_seat!(State);
