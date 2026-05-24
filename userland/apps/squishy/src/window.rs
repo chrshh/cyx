@@ -5,7 +5,10 @@ use smithay_client_toolkit::{
     output::{OutputHandler, OutputState},
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
-    seat::{Capability, SeatHandler, SeatState, keyboard::KeyboardHandler},
+    seat::{
+        Capability, SeatHandler, SeatState,
+        keyboard::{KeyboardHandler, Keysym},
+    },
     shell::{
         WaylandSurface,
         xdg::{
@@ -20,7 +23,7 @@ use wayland_client::{
     Connection, QueueHandle,
     globals::registry_queue_init,
     protocol::{
-        wl_keyboard::{self, WlKeyboard},
+        wl_keyboard::{self},
         wl_output, wl_seat, wl_shm, wl_surface,
     },
 };
@@ -30,7 +33,7 @@ use crate::parser::{self, Cursor};
 use crate::pty::{self, Pty};
 use crate::render;
 use crate::{font::FontCache, grid::Cell};
-use calloop::{EventLoop, Interest, LoopHandle, Mode, PostAction, generic::Generic};
+use calloop::{EventLoop, Interest, Mode, PostAction, generic::Generic};
 use calloop_wayland_source::WaylandSource;
 use std::io::{Read, Write};
 use std::os::fd::AsFd;
@@ -59,6 +62,7 @@ pub struct State {
 
     seat_state: SeatState,
     keyboard: Option<wl_keyboard::WlKeyboard>,
+    keyboard_focus: bool,
 }
 
 pub fn run() {
@@ -114,6 +118,7 @@ pub fn run() {
         needs_redraw: false,
         seat_state: SeatState::new(&globals, &qh),
         keyboard: None,
+        keyboard_focus: true,
     };
 
     let mut event_loop: EventLoop<State> = EventLoop::try_new().expect("calloop");
@@ -343,10 +348,11 @@ impl SeatHandler for State {
         _: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Keyboard {
-            if let Some(kb) = self.keyboard.take() {
-                kb.release();
-            }
+        if capability != Capability::Keyboard {
+            return;
+        }
+        if let Some(kb) = self.keyboard.take() {
+            kb.release();
         }
     }
 
@@ -359,11 +365,14 @@ impl KeyboardHandler for State {
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
         _keyboard: &wl_keyboard::WlKeyboard,
-        _surface: &wl_surface::WlSurface,
+        surface: &wl_surface::WlSurface,
         _serial: u32,
         _raw: &[u32],
         _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
     ) {
+        if self.window.wl_surface() == surface {
+            self.keyboard_focus = true;
+        }
         println!("fn enter");
     }
 
@@ -372,11 +381,13 @@ impl KeyboardHandler for State {
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
         _keyboard: &wl_keyboard::WlKeyboard,
-        _surface: &wl_surface::WlSurface,
+        surface: &wl_surface::WlSurface,
 
         _serial: u32,
     ) {
-        println!("fn leave");
+        if self.window.wl_surface() == surface {
+            self.keyboard_focus = false;
+        }
     }
 
     fn press_key(
@@ -389,10 +400,29 @@ impl KeyboardHandler for State {
 
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        if let Some(text) = &event.utf8 {
-            let _ = self.pty.file.write(text.as_bytes());
-        }
-        self.needs_redraw = true;
+        let bytes: &[u8] = match event.keysym {
+            Keysym::Up => b"\x1b[A",
+            Keysym::Down => b"\x1b[B",
+            Keysym::Right => b"\x1b[C",
+            Keysym::Left => b"\x1b[D",
+            Keysym::Home => b"\x1b[H",
+            Keysym::End => b"\x1b[F",
+            Keysym::Page_Up => b"\x1b[5~",
+            Keysym::Page_Down => b"\x1b[6~",
+            Keysym::Delete => b"\x1b[3~",
+            Keysym::Insert => b"\x1b[2~",
+            Keysym::F1 => b"\x1bOP",
+            Keysym::F2 => b"\x1bOQ",
+            Keysym::F3 => b"\x1bOR",
+            Keysym::F4 => b"\x1bOS",
+            _ => {
+                if let Some(text) = &event.utf8 {
+                    let _ = self.pty.file.write_all(text.as_bytes());
+                }
+                return;
+            }
+        };
+        let _ = self.pty.file.write_all(bytes);
     }
 
     fn release_key(
@@ -404,8 +434,6 @@ impl KeyboardHandler for State {
 
         _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        println!("fn release_key");
-        self.needs_redraw = true;
     }
 
     fn update_modifiers(
@@ -418,7 +446,6 @@ impl KeyboardHandler for State {
         _raw_modifiers: smithay_client_toolkit::seat::keyboard::RawModifiers,
         _layout: u32,
     ) {
-        println!("fn update_modifiers");
     }
 
     fn repeat_key(
@@ -429,7 +456,6 @@ impl KeyboardHandler for State {
         _serial: u32,
         _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        println!("fn repeat_key");
     }
 }
 

@@ -15,6 +15,15 @@ impl Default for Cell {
     }
 }
 
+impl Cell {
+    pub fn default_fg(&mut self) {
+        self.fg = [0xe0, 0xe0, 0xe0];
+    }
+    pub fn default_bg(&mut self) {
+        self.bg = [0x1e, 0x1e, 0x1e];
+    }
+}
+
 pub struct Grid {
     pub cols: usize,
     pub rows: usize,
@@ -45,6 +54,13 @@ impl Grid {
     pub fn write_str(&mut self, col: usize, row: usize, s: &str) {
         for (i, ch) in s.chars().enumerate() {
             self.put(col + i, row, ch);
+        }
+    }
+
+    pub fn clear_range(&mut self, start: usize, end: usize) {
+        let end = end.min(self.cells.len());
+        for cell in &mut self.cells[start..end] {
+            *cell = Cell::default();
         }
     }
 }

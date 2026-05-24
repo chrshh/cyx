@@ -21,6 +21,7 @@ impl<'a> vte::Perform for Performer<'a> {
         }
         self.cursor.col += 1;
     }
+
     fn execute(&mut self, byte: u8) {
         match byte {
             b'\n' => self.cursor.row += 1,
@@ -34,23 +35,95 @@ impl<'a> vte::Perform for Performer<'a> {
         &mut self,
         params: &vte::Params,
         _intermediates: &[u8],
-        _ignore: bool,
+        ignore: bool,
         action: char,
     ) {
-        if action == 'm' {
-            for param in params.iter() {
-                let code = param[0];
-                match code {
-                    0 => {
-                        self.cursor.cell.fg = [0xe0, 0xe0, 0xe0];
+        if ignore {
+            return;
+        }
+
+        match action {
+            /* colors */
+            'm' => {
+                if params.is_empty() {
+                    self.cursor.cell = Cell::default();
+                    return;
+                }
+
+                for param in params.iter() {
+                    let code = param[0];
+                    match code {
+                        0 => {
+                            self.cursor.cell = Cell::default();
+                        }
+                        30..=37 => self.cursor.cell.fg = ansi_color(code - 30),
+                        39 => self.cursor.cell.default_fg(),
+                        40..=47 => self.cursor.cell.bg = ansi_color(code - 40),
+                        49 => self.cursor.cell.default_bg(),
+                        _ => {}
                     }
-                    30..=37 => self.cursor.cell.fg = ansi_color(code - 30),
-                    40..=47 => self.cursor.cell.bg = ansi_color(code - 40),
+                }
+            }
+            /* cursor movements */
+            'A' => {
+                // UP
+                let n = params.iter().next().map(|p| p[0]).unwrap_or(1).max(1) as usize;
+                self.cursor.row = self.cursor.row.saturating_sub(n);
+            }
+            'B' => {
+                // DOWN
+                let n = params.iter().next().map(|p| p[0]).unwrap_or(1).max(1) as usize;
+                self.cursor.row = (self.cursor.row + n).min(self.grid.rows.saturating_sub(1));
+            }
+            'C' => {
+                // RIGHT
+                let n = params.iter().next().map(|p| p[0]).unwrap_or(1).max(1) as usize;
+                self.cursor.col = (self.cursor.col + n).min(self.grid.cols.saturating_sub(1));
+            }
+            'D' => {
+                // LEFT
+                let n = params.iter().next().map(|p| p[0]).unwrap_or(1).max(1) as usize;
+                self.cursor.col = self.cursor.col.saturating_sub(n);
+            }
+            'H' => {
+                // cursor reset
+                let mut it = params.iter();
+                let row = it.next().map(|p| p[0]).unwrap_or(1).max(1) as usize - 1;
+                let col = it.next().map(|p| p[0]).unwrap_or(1).max(1) as usize - 1;
+                self.cursor.row = row.min(self.grid.rows.saturating_sub(1));
+                self.cursor.col = col.min(self.grid.cols.saturating_sub(1));
+            }
+
+            /* erase line / display */
+            'J' => {
+                let n = params.iter().next().map(|p| p[0]).unwrap_or(0) as usize;
+                let pos = self.cursor.row * self.grid.cols + self.cursor.col;
+                let end = self.grid.rows * self.grid.cols;
+                match n {
+                    0 => self.grid.clear_range(pos, end), // cursor -> end of screen
+                    1 => self.grid.clear_range(0, pos + 1), // start of screen -> cursor
+                    2 => self.grid.clear_range(0, end),   // full screen
                     _ => {}
                 }
             }
+            'K' => {
+                let n = params.iter().next().map(|p| p[0]).unwrap_or(0) as usize;
+                let row_start = self.cursor.row * self.grid.cols;
+                let row_end = row_start + self.grid.cols;
+                let pos = row_start + self.cursor.col;
+                match n {
+                    0 => self.grid.clear_range(pos, row_end), // cursor -> end of line
+                    1 => self.grid.clear_range(row_start, pos + 1), // start of line -> cursor
+                    2 => self.grid.clear_range(row_start, row_end), // whole line
+                    _ => {}
+                }
+            }
+
+            _ => (),
         }
     }
+
+    /* def behavior: void */
 }
 
 fn ansi_color(code: u16) -> [u8; 3] {
@@ -63,9 +136,7 @@ fn ansi_color(code: u16) -> [u8; 3] {
 }
 
 pub fn feed(parser: &mut vte::Parser, grid: &mut Grid, cursor: &mut Cursor, bytes: &[u8]) {
-    // construct performer
     let mut performer = Performer { grid, cursor };
-
     parser.advance(&mut performer, bytes);
 }
 
@@ -73,8 +144,20 @@ pub fn feed(parser: &mut vte::Parser, grid: &mut Grid, cursor: &mut Cursor, byte
 mod tests {
     use super::*;
 
+    fn setup() -> (vte::Parser, Grid, Cursor) {
+        (
+            vte::Parser::new(),
+            Grid::new(10, 5),
+            Cursor {
+                col: 0,
+                row: 0,
+                cell: Cell::default(),
+            },
+        )
+    }
+
     #[test]
-    fn prints_hello_world() {
+    fn prints_hello() {
         let mut grid = Grid::new(80, 24);
         let mut cursor = Cursor {
             col: 0,
@@ -114,5 +197,237 @@ mod tests {
         feed(&mut parser, &mut grid, &mut cursor, b"hello\r\n");
         assert_eq!(cursor.row, 1);
         assert_eq!(cursor.col, 0);
+    }
+
+    #[test]
+    fn cursor_up() {
+        let mut grid = Grid::new(80, 24);
+        let mut cursor = Cursor {
+            col: 0,
+            row: 5,
+            cell: Cell::default(),
+        };
+        let mut parser = vte::Parser::new();
+        feed(&mut parser, &mut grid, &mut cursor, b"\x1b[3A");
+        assert_eq!(cursor.row, 2);
+    }
+
+    #[test]
+    fn cursor_down() {
+        let mut grid = Grid::new(80, 24);
+        let mut cursor = Cursor {
+            col: 0,
+            row: 23,
+            cell: Cell::default(),
+        };
+        let mut parser = vte::Parser::new();
+        feed(&mut parser, &mut grid, &mut cursor, b"\x1b[3B");
+        assert_eq!(cursor.row, 23);
+    }
+
+    #[test]
+    fn cursor_left() {
+        let mut grid = Grid::new(80, 24);
+        let mut cursor = Cursor {
+            col: 0,
+            row: 23,
+            cell: Cell::default(),
+        };
+        let mut parser = vte::Parser::new();
+        feed(&mut parser, &mut grid, &mut cursor, b"\x1b[3D");
+        assert_eq!(cursor.col, 0);
+    }
+
+    #[test]
+    fn cursor_right() {
+        let mut grid = Grid::new(80, 24);
+        let mut cursor = Cursor {
+            col: 79,
+            row: 23,
+            cell: Cell::default(),
+        };
+        let mut parser = vte::Parser::new();
+        feed(&mut parser, &mut grid, &mut cursor, b"\x1b[3C");
+        assert_eq!(cursor.col, 79);
+    }
+
+    #[test]
+    fn cursor_position() {
+        let mut grid = Grid::new(80, 24);
+        let mut cursor = Cursor {
+            col: 0,
+            row: 0,
+            cell: Cell::default(),
+        };
+        let mut parser = vte::Parser::new();
+        feed(&mut parser, &mut grid, &mut cursor, b"\x1b[10;20H");
+        assert_eq!(cursor.row, 9);
+        assert_eq!(cursor.col, 19);
+    }
+
+    #[test]
+    fn erase_to_end_of_line() {
+        let mut grid = Grid::new(10, 1);
+        let mut cursor = Cursor {
+            col: 0,
+            row: 0,
+            cell: Cell::default(),
+        };
+        let mut parser = vte::Parser::new();
+        feed(
+            &mut parser,
+            &mut grid,
+            &mut cursor,
+            b"abcdefghij\x1b[1;6H\x1b[K",
+        );
+        assert_eq!(grid.cells[4].ch, 'e');
+        assert_eq!(grid.cells[5].ch, ' ');
+        assert_eq!(grid.cells[9].ch, ' ');
+        assert_eq!(cursor.col, 5);
+    }
+
+    /* -- cursor motions -- */
+
+    #[test]
+    fn cursor_up_default() {
+        let (mut p, mut g, mut c) = setup();
+        c.row = 3;
+        feed(&mut p, &mut g, &mut c, b"\x1b[A");
+        assert_eq!(c.row, 2);
+    }
+
+    #[test]
+    fn cursor_up_saturates_at_zero() {
+        let (mut p, mut g, mut c) = setup();
+        c.row = 1;
+        feed(&mut p, &mut g, &mut c, b"\x1b[5A");
+        assert_eq!(c.row, 0);
+    }
+
+    #[test]
+    fn cursor_down_n() {
+        let (mut p, mut g, mut c) = setup();
+        feed(&mut p, &mut g, &mut c, b"\x1b[2B");
+        assert_eq!(c.row, 2);
+    }
+
+    #[test]
+    fn cursor_right_n() {
+        let (mut p, mut g, mut c) = setup();
+        feed(&mut p, &mut g, &mut c, b"\x1b[4C");
+        assert_eq!(c.col, 4);
+    }
+
+    #[test]
+    fn cursor_left_n() {
+        let (mut p, mut g, mut c) = setup();
+        c.col = 5;
+        feed(&mut p, &mut g, &mut c, b"\x1b[3D");
+        assert_eq!(c.col, 2);
+    }
+
+    #[test]
+    fn cursor_left_saturates_at_zero() {
+        let (mut p, mut g, mut c) = setup();
+        c.col = 2;
+        feed(&mut p, &mut g, &mut c, b"\x1b[9D");
+        assert_eq!(c.col, 0);
+    }
+
+    #[test]
+    fn cursor_position_default_is_top_left() {
+        let (mut p, mut g, mut c) = setup();
+        c.row = 3;
+        c.col = 4;
+        feed(&mut p, &mut g, &mut c, b"\x1b[H");
+        assert_eq!(c.row, 0);
+        assert_eq!(c.col, 0);
+    }
+
+    #[test]
+    fn cursor_position_only_row() {
+        let (mut p, mut g, mut c) = setup();
+        feed(&mut p, &mut g, &mut c, b"\x1b[4H");
+        assert_eq!(c.row, 3);
+        assert_eq!(c.col, 0);
+    }
+
+    /* -- Erase display & line -- */
+
+    #[test]
+    fn erase_display_to_end() {
+        let (mut p, mut g, mut c) = setup();
+        for cell in &mut g.cells {
+            cell.ch = 'x';
+        }
+        c.row = 2;
+        c.col = 3;
+        feed(&mut p, &mut g, &mut c, b"\x1b[J");
+        assert_eq!(g.cells[0].ch, 'x');
+        assert_eq!(g.cells[2 * 10 + 2].ch, 'x');
+        assert_eq!(g.cells[2 * 10 + 3].ch, ' ');
+        assert_eq!(g.cells[g.cells.len() - 1].ch, ' ');
+        assert_eq!(c.row, 2);
+        assert_eq!(c.col, 3);
+    }
+
+    #[test]
+    fn erase_display_to_start() {
+        let (mut p, mut g, mut c) = setup();
+        for cell in &mut g.cells {
+            cell.ch = 'x';
+        }
+        c.row = 2;
+        c.col = 3;
+        feed(&mut p, &mut g, &mut c, b"\x1b[1J");
+        assert_eq!(g.cells[0].ch, ' ');
+        assert_eq!(g.cells[2 * 10 + 3].ch, ' ');
+        assert_eq!(g.cells[2 * 10 + 4].ch, 'x');
+        assert_eq!(g.cells[g.cells.len() - 1].ch, 'x');
+    }
+
+    #[test]
+    fn erase_display_all() {
+        let (mut p, mut g, mut c) = setup();
+        for cell in &mut g.cells {
+            cell.ch = 'x';
+        }
+        feed(&mut p, &mut g, &mut c, b"\x1b[2J");
+        for cell in &g.cells {
+            assert_eq!(cell.ch, ' ');
+        }
+    }
+
+    #[test]
+    fn erase_line_to_start() {
+        let (mut p, mut g, mut c) = setup();
+        feed(&mut p, &mut g, &mut c, b"abcdefghij");
+        feed(&mut p, &mut g, &mut c, b"\x1b[1;6H\x1b[1K");
+        assert_eq!(g.cells[0].ch, ' ');
+        assert_eq!(g.cells[5].ch, ' ');
+        assert_eq!(g.cells[6].ch, 'g');
+        assert_eq!(g.cells[9].ch, 'j');
+    }
+
+    #[test]
+    fn erase_line_all() {
+        let (mut p, mut g, mut c) = setup();
+        feed(&mut p, &mut g, &mut c, b"abcdefghij");
+        feed(&mut p, &mut g, &mut c, b"\x1b[2;1Hxxxxx");
+        feed(&mut p, &mut g, &mut c, b"\x1b[1;5H\x1b[2K");
+        for col in 0..10 {
+            assert_eq!(g.cells[col].ch, ' ');
+        }
+        assert_eq!(g.cells[10].ch, 'x');
+        assert_eq!(g.cells[14].ch, 'x');
+    }
+
+    #[test]
+    fn cup_then_print_writes_at_target() {
+        let (mut p, mut g, mut c) = setup();
+        feed(&mut p, &mut g, &mut c, b"\x1b[3;5HX");
+        assert_eq!(g.cells[2 * 10 + 4].ch, 'X');
+        assert_eq!(c.row, 2);
+        assert_eq!(c.col, 5);
     }
 }
