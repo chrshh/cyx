@@ -12,19 +12,33 @@ pub struct Performer<'a> {
     pub cursor: &'a mut Cursor,
 }
 
+impl<'a> Performer<'a> {
+    fn newline(&mut self) {
+        self.cursor.row += 1;
+        if self.cursor.row >= self.grid.rows {
+            self.grid.scroll_up();
+            self.cursor.row = self.grid.rows - 1;
+        }
+    }
+}
+
 impl<'a> vte::Perform for Performer<'a> {
     fn print(&mut self, c: char) {
-        if self.cursor.col < self.grid.cols && self.cursor.row < self.grid.rows {
-            let mut cell = self.cursor.cell; // Cell is Copy
-            cell.ch = c;
-            self.grid.cells[self.cursor.row * self.grid.cols + self.cursor.col] = cell;
+        if self.cursor.col >= self.grid.cols {
+            self.cursor.col = 0;
+            self.newline();
         }
+
+        let mut cell = self.cursor.cell;
+        cell.ch = c;
+        let idx = self.cursor.row * self.grid.cols + self.cursor.col;
+        self.grid.cells[idx] = cell;
         self.cursor.col += 1;
     }
 
     fn execute(&mut self, byte: u8) {
         match byte {
-            b'\n' => self.cursor.row += 1,
+            b'\n' => self.newline(),
             b'\r' => self.cursor.col = 0,
             b'\x08' => self.cursor.col = self.cursor.col.saturating_sub(1),
             _ => (),
@@ -429,5 +443,34 @@ mod tests {
         assert_eq!(g.cells[2 * 10 + 4].ch, 'X');
         assert_eq!(c.row, 2);
         assert_eq!(c.col, 5);
+    }
+
+    /* -- scrolling / wrapping -- */
+
+    #[test]
+    fn print_wraps_at_right_edge() {
+        let (mut p, mut g, mut c) = setup(); // 10x5 grid
+        feed(&mut p, &mut g, &mut c, b"abcdefghijkl"); // 12 chars on a 10-wide grid
+        assert_eq!(g.cells[9].ch, 'j'); // last of first row
+        assert_eq!(g.cells[10].ch, 'k'); // first of second row
+        assert_eq!(g.cells[11].ch, 'l');
+        assert_eq!(c.row, 1);
+        assert_eq!(c.col, 2);
+    }
+
+    #[test]
+    fn print_scrolls_off_bottom() {
+        let (mut p, mut g, mut c) = setup(); // 10x5 grid
+        // Print 6 rows of distinct chars.
+        feed(
+            &mut p,
+            &mut g,
+            &mut c,
+            b"aaaaaaaaaa\r\nbbbbbbbbbb\r\ncccccccccc\r\ndddddddddd\r\neeeeeeeeee\r\nffffffffff",
+        );
+        // Top row should now be 'b' (was second row before scroll).
+        assert_eq!(g.cells[0].ch, 'b');
+        // Bottom row is 'f'.
+        assert_eq!(g.cells[40].ch, 'f');
     }
 }

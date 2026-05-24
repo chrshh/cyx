@@ -63,4 +63,12 @@ impl Grid {
             *cell = Cell::default();
         }
     }
+
+    pub fn scroll_up(&mut self) {
+        self.cells.copy_within(self.cols.., 0);
+        let last_start = (self.rows - 1) * self.cols;
+        for cell in &mut self.cells[last_start..] {
+            *cell = Cell::default();
+        }
+    }
 }
