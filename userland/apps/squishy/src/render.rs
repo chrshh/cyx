@@ -1,6 +1,6 @@
 use crate::font::FontCache;
 use crate::grid::Grid;
-use crate::parser::Cursor;
+use crate::parser::{Cursor, CursorStyle};
 
 /// Buffer layout: little-endian ARGB8888, so bytes are [B, G, R, A] per pixel,
 pub fn paint(
@@ -79,15 +79,27 @@ pub fn paint(
     if cursor.col < grid.cols && cursor.row < grid.rows {
         let cursor_x = cursor.col * cell_w;
         let cursor_y = cursor.row * cell_h;
-        let bar_w = 2usize;
-        let bar_color = [0xff, 0xff, 0xff]; // white, RGB
 
-        for y in cursor_y..(cursor_y + cell_h).min(buf_h) {
-            for x in cursor_x..(cursor_x + bar_w).min(buf_w) {
+        let (rx, ry, rw, rh) = match cursor.style {
+            CursorStyle::Bar => (cursor_x, cursor_y, 2, cell_h),
+            CursorStyle::Underline => {
+                let underline_h = 2;
+                (
+                    cursor_x,
+                    cursor_y + cell_h - underline_h,
+                    cell_w,
+                    underline_h,
+                )
+            }
+            CursorStyle::Block => (cursor_x, cursor_y, cell_w, cell_h),
+        };
+
+        for y in ry..(ry + rh).min(buf_h) {
+            for x in rx..(rx + rw).min(buf_w) {
                 let off = y * stride + x * 4;
-                buf[off] = bar_color[2]; // B
-                buf[off + 1] = bar_color[1]; // G
-                buf[off + 2] = bar_color[0]; // R
+                buf[off] = 0xff;
+                buf[off + 1] = 0xff;
+                buf[off + 2] = 0xff;
                 buf[off + 3] = 0xff;
             }
         }

@@ -28,11 +28,11 @@ use wayland_client::{
     },
 };
 
-use crate::grid::Grid;
 use crate::parser::{self, Cursor};
 use crate::pty::{self, Pty};
 use crate::render;
 use crate::{font::FontCache, grid::Cell};
+use crate::{grid::Grid, parser::CursorStyle};
 use calloop::{EventLoop, Interest, Mode, PostAction, generic::Generic};
 use calloop_wayland_source::WaylandSource;
 use std::io::{Read, Write};
@@ -114,6 +114,7 @@ pub fn run() {
             col: 0,
             row: 0,
             cell: Cell::default(),
+            style: CursorStyle::Bar,
         },
         needs_redraw: false,
         seat_state: SeatState::new(&globals, &qh),
@@ -411,6 +412,7 @@ impl KeyboardHandler for State {
             Keysym::Page_Down => b"\x1b[6~",
             Keysym::Delete => b"\x1b[3~",
             Keysym::Insert => b"\x1b[2~",
+            Keysym::BackSpace => b"\x7f",
             Keysym::F1 => b"\x1bOP",
             Keysym::F2 => b"\x1bOQ",
             Keysym::F3 => b"\x1bOR",

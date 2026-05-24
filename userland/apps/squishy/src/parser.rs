@@ -1,10 +1,18 @@
 use crate::grid::{Cell, Grid};
 
-// add <Cell> in later for coloring
+#[derive(Copy, Clone, Debug)]
 pub struct Cursor {
     pub col: usize,
     pub row: usize,
     pub cell: Cell,
+    pub style: CursorStyle,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum CursorStyle {
+    Block,
+    Underline,
+    Bar,
 }
 
 pub struct Performer<'a> {
@@ -53,6 +61,17 @@ impl<'a> vte::Perform for Performer<'a> {
         action: char,
     ) {
         if ignore {
+            return;
+        }
+
+        if action == 'q' && intermediates == b" " {
+            let n = params.iter().next().map(|p| p[0]).unwrap_or(1);
+            self.cursor.style = match n {
+                0..=2 => CursorStyle::Block,
+                3 | 4 => CursorStyle::Underline,
+                5 | 6 => CursorStyle::Bar,
+                _ => return,
+            };
             return;
         }
 
@@ -187,6 +206,7 @@ mod tests {
                 col: 0,
                 row: 0,
                 cell: Cell::default(),
+                style: CursorStyle::Bar,
             },
         )
     }
@@ -198,6 +218,7 @@ mod tests {
             col: 0,
             row: 0,
             cell: Cell::default(),
+            style: CursorStyle::Bar,
         };
         let mut parser = vte::Parser::new();
         feed(&mut parser, &mut grid, &mut cursor, b"hello");
@@ -214,6 +235,7 @@ mod tests {
             col: 0,
             row: 0,
             cell: Cell::default(),
+            style: CursorStyle::Bar,
         };
         let mut parser = vte::Parser::new();
         feed(&mut parser, &mut grid, &mut cursor, b"hello\x08");
@@ -227,6 +249,8 @@ mod tests {
             col: 0,
             row: 0,
             cell: Cell::default(),
+
+            style: CursorStyle::Bar,
         };
         let mut parser = vte::Parser::new();
         feed(&mut parser, &mut grid, &mut cursor, b"hello\r\n");
@@ -241,6 +265,8 @@ mod tests {
             col: 0,
             row: 5,
             cell: Cell::default(),
+
+            style: CursorStyle::Bar,
         };
         let mut parser = vte::Parser::new();
         feed(&mut parser, &mut grid, &mut cursor, b"\x1b[3A");
@@ -254,6 +280,8 @@ mod tests {
             col: 0,
             row: 23,
             cell: Cell::default(),
+
+            style: CursorStyle::Bar,
         };
         let mut parser = vte::Parser::new();
         feed(&mut parser, &mut grid, &mut cursor, b"\x1b[3B");
@@ -267,6 +295,8 @@ mod tests {
             col: 0,
             row: 23,
             cell: Cell::default(),
+
+            style: CursorStyle::Bar,
         };
         let mut parser = vte::Parser::new();
         feed(&mut parser, &mut grid, &mut cursor, b"\x1b[3D");
@@ -280,6 +310,7 @@ mod tests {
             col: 79,
             row: 23,
             cell: Cell::default(),
+            style: CursorStyle::Bar,
         };
         let mut parser = vte::Parser::new();
         feed(&mut parser, &mut grid, &mut cursor, b"\x1b[3C");
@@ -293,6 +324,7 @@ mod tests {
             col: 0,
             row: 0,
             cell: Cell::default(),
+            style: CursorStyle::Bar,
         };
         let mut parser = vte::Parser::new();
         feed(&mut parser, &mut grid, &mut cursor, b"\x1b[10;20H");
@@ -307,6 +339,7 @@ mod tests {
             col: 0,
             row: 0,
             cell: Cell::default(),
+            style: CursorStyle::Bar,
         };
         let mut parser = vte::Parser::new();
         feed(
@@ -493,5 +526,19 @@ mod tests {
         assert_eq!(g.cells[0].ch, 'b');
         // Bottom row is 'f'.
         assert_eq!(g.cells[40].ch, 'f');
+    }
+
+    #[test]
+    fn cursor_style_block() {
+        let (mut p, mut g, mut c) = setup();
+        feed(&mut p, &mut g, &mut c, b"\x1b[2 q");
+        assert_eq!(c.style, CursorStyle::Block);
+    }
+
+    #[test]
+    fn cursor_style_bar() {
+        let (mut p, mut g, mut c) = setup();
+        feed(&mut p, &mut g, &mut c, b"\x1b[6 q");
+        assert_eq!(c.style, CursorStyle::Bar);
     }
 }
