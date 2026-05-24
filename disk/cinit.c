@@ -130,13 +130,11 @@ int main(void) {
   sigfillset(&set);
   sigprocmask(SIG_BLOCK, &set, NULL);
 
-  // spawn((char *[]){"/bin/cjsh", NULL});
-  // tinywl's -s flag runs a startup command via /bin/sh -c. We launch foot
-  // (Wayland-native terminal) so the user has a way into the system from
-  // inside the compositor. Add more & background commands here later for
-  // dbus-daemon, etc.
+  // tinywl's -s flag runs a startup command via /bin/sh -c. We launch
+  // squishy (our own Wayland-native terminal emulator), which in turn
+  // execs cjsh — see $SHELL set above, which squishy reads.
   spawn((char *[]){"/usr/bin/seatd-launch", "--", "/bin/display",
-                   "-s", "foot", NULL});
+                   "-s", "/bin/squishy", NULL});
 
   while (1) {
     sigwait(&set, &sig);
@@ -164,14 +162,10 @@ static void sigreap(void) {
   // Stale socket left by a seatd that died without cleanup. Safe to unlink:
   // /run is tmpfs and the only writer is seatd-launch, which always recreates.
   unlink("/run/seatd.sock");
-  // Respawn our boy
-  // spawn((char *[]){"/bin/cjsh", NULL});
-  // tinywl's -s flag runs a startup command via /bin/sh -c. We launch foot
-  // (Wayland-native terminal) so the user has a way into the system from
-  // inside the compositor. Add more & background commands here later for
-  // dbus-daemon, etc.
+  // Respawn the compositor + squishy (our terminal emulator). squishy
+  // execs $SHELL (=/bin/cjsh) inside the pty it opens.
   spawn((char *[]){"/usr/bin/seatd-launch", "--", "/bin/display",
-                   "-s", "foot", NULL});
+                   "-s", "/bin/squishy", NULL});
 }
 
 static void sigreboot(void) {

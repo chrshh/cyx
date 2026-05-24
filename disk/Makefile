@@ -10,6 +10,8 @@ ROOTFS  := rootfs
 DEBIAN  := ../build/debian-rootfs
 CJSH    := ../build/cjsh
 DISPLAY := ../build/display
+SQUISHY := ../build/squishy
+TEXTR   := ../build/textr
 CMDDIR  := ../build/cmd
 IMAGE   := ../build/disk.img
 # 12G: Mesa + GTK + Qt + Xwayland + fonts + Debian baseline runs ~2.5GB
@@ -27,7 +29,7 @@ init: cinit.c
 
 # Layered staging: Debian userland goes down first as the base, then our own
 # binaries and config files overlay on top. 
-rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display stage-cmd $(ROOTFS)/etc/passwd
+rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display $(ROOTFS)/bin/squishy $(ROOTFS)/bin/textr stage-cmd $(ROOTFS)/etc/passwd
 	mkdir -p $(ROOTFS)/dev $(ROOTFS)/proc $(ROOTFS)/sys $(ROOTFS)/tmp $(ROOTFS)/root $(ROOTFS)/home $(ROOTFS)/run
 
 # The marker file ensures we only extract and purge once. 
@@ -66,6 +68,12 @@ $(ROOTFS)/bin/cjsh: $(CJSH) $(ROOTFS)/.staged
 
 $(ROOTFS)/bin/display: $(DISPLAY) $(ROOTFS)/.staged
 	install -D -m 755 $(DISPLAY) $(ROOTFS)/bin/display
+
+$(ROOTFS)/bin/squishy: $(SQUISHY) $(ROOTFS)/.staged
+	install -D -m 755 $(SQUISHY) $(ROOTFS)/bin/squishy
+
+$(ROOTFS)/bin/textr: $(TEXTR) $(ROOTFS)/.staged
+	install -D -m 755 $(TEXTR) $(ROOTFS)/bin/textr
 
 $(ROOTFS)/etc/passwd: etc/passwd etc/group etc/hostname $(ROOTFS)/.staged
 	mkdir -p $(ROOTFS)/etc
