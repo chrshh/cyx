@@ -21,11 +21,11 @@ use wayland_client::{
     protocol::{wl_output, wl_shm, wl_surface},
 };
 
-use crate::font::FontCache;
 use crate::grid::Grid;
 use crate::parser::{self, Cursor};
 use crate::pty::{self, Pty};
 use crate::render;
+use crate::{font::FontCache, grid::Cell};
 use calloop::{EventLoop, Interest, LoopHandle, Mode, PostAction, generic::Generic};
 use calloop_wayland_source::WaylandSource;
 use std::io::Read;
@@ -99,7 +99,11 @@ pub fn run() {
         grid,
         pty,
         parser: vte::Parser::new(),
-        cursor: Cursor { col: 0, row: 0 },
+        cursor: Cursor {
+            col: 0,
+            row: 0,
+            cell: Cell::default(),
+        },
         needs_redraw: false,
     };
 
