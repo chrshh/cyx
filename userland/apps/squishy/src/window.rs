@@ -23,7 +23,13 @@ use wayland_client::{
 
 use crate::font::FontCache;
 use crate::grid::Grid;
+use crate::parser::{self, Cursor};
+use crate::pty::{self, Pty};
 use crate::render;
+use calloop::{EventLoop, Interest, LoopHandle, Mode, PostAction, generic::Generic};
+use calloop_wayland_source::WaylandSource;
+use std::io::Read;
+use std::os::fd::AsFd;
 
 pub struct State {
     registry_state: RegistryState,
@@ -41,14 +47,17 @@ pub struct State {
 
     font: FontCache,
     grid: Grid,
+
+    pty: Pty,
+    parser: vte::Parser,
+    cursor: Cursor,
+    needs_redraw: bool,
 }
 
 pub fn run() {
     let conn = Connection::connect_to_env().expect("failed to connect to wayland compositor");
-
-    let (globals, mut event_queue) =
+    let (globals, event_queue) =
         registry_queue_init::<State>(&conn).expect("failed to initialize registry");
-
     let qh = event_queue.handle();
 
     /* Bind globals */
@@ -58,29 +67,21 @@ pub fn run() {
     let shm = Shm::bind(&globals, &qh).expect("wl_shm not available");
     let pool = SlotPool::new(256 * 256 * 4, &shm).expect("failed to create slot pool");
 
+    let surface = compositor_state.create_surface(&qh);
+    let window = xdg_shell.create_window(surface, WindowDecorations::RequestServer, &qh);
+    window.set_title("squishy");
+    window.set_app_id("squishy");
+    window.set_min_size(Some((200, 100)));
+    window.commit();
+
     let font = FontCache::new(16.0);
     let init_cols = 80;
     let init_rows = 24;
-    let grid = {
-        let mut g = Grid::new(init_cols, init_rows);
-        g.write_str(0, 0, "seaterm");
-        g.write_str(0, 1, "press anything (no input yet)");
-        g.write_str(0, 3, "the quick brown fox jumps over the lazy dog");
-        g.write_str(0, 4, "0123456789  !@#$%^&*()  []{}<>  =>  ->  ::");
-        g
-    };
-
+    let grid = Grid::new(init_cols, init_rows);
     let init_w = (init_cols * font.cell_w) as u32;
     let init_h = (init_rows * font.cell_h) as u32;
 
-    let surface = compositor_state.create_surface(&qh);
-    let window = xdg_shell.create_window(surface, WindowDecorations::RequestServer, &qh);
-
-    window.set_title("seaterm");
-    window.set_app_id("seaterm");
-    window.set_min_size(Some((200, 100)));
-
-    window.commit();
+    let pty = pty::new(init_cols as u16, init_rows as u16).expect("pty");
 
     let mut state = State {
         registry_state: RegistryState::new(&globals),
@@ -96,10 +97,65 @@ pub fn run() {
         first_configure: true,
         font,
         grid,
+        pty,
+        parser: vte::Parser::new(),
+        cursor: Cursor { col: 0, row: 0 },
+        needs_redraw: false,
     };
 
+    let mut event_loop: EventLoop<State> = EventLoop::try_new().expect("calloop");
+    let loop_handle = event_loop.handle();
+
+    WaylandSource::new(conn.clone(), event_queue)
+        .insert(loop_handle.clone())
+        .expect("insert wayland source");
+
+    let pty_fd = state
+        .pty
+        .file
+        .as_fd()
+        .try_clone_to_owned()
+        .expect("clone fd");
+
+    loop_handle
+        .insert_source(
+            Generic::new(pty_fd, Interest::READ, Mode::Level),
+            |_event, _fd, state: &mut State| {
+                let mut buf = [0u8; 4096];
+                loop {
+                    match (&state.pty.file).read(&mut buf) {
+                        Ok(0) => {
+                            state.running = false;
+                            break;
+                        }
+                        Ok(n) => {
+                            parser::feed(
+                                &mut state.parser,
+                                &mut state.grid,
+                                &mut state.cursor,
+                                &buf[..n],
+                            );
+                            state.needs_redraw = true;
+                        }
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+                        Err(_) => {
+                            state.running = false;
+                            break;
+                        }
+                    }
+                }
+                Ok(PostAction::Continue)
+            },
+        )
+        .expect("insert pty source");
+
     while state.running {
-        event_queue.blocking_dispatch(&mut state).unwrap();
+        event_loop.dispatch(None, &mut state).expect("dispatch");
+
+        if state.needs_redraw {
+            state.draw(&qh);
+            state.needs_redraw = false;
+        }
     }
 }
 
@@ -198,6 +254,22 @@ impl WindowHandler for State {
     ) {
         self.width = configure.new_size.0.map(|w| w.get()).unwrap_or(self.width);
         self.height = configure.new_size.1.map(|h| h.get()).unwrap_or(self.height);
+
+        let cols = (self.width as usize / self.font.cell_w).max(1);
+        let rows = (self.height as usize / self.font.cell_h).max(1);
+        if cols != self.grid.cols || rows != self.grid.rows {
+            self.grid.resize(cols, rows);
+
+            let _ = rustix::termios::tcsetwinsize(
+                &self.pty.file,
+                rustix::termios::Winsize {
+                    ws_row: rows as u16,
+                    ws_col: cols as u16,
+                    ws_xpixel: 0,
+                    ws_ypixel: 0,
+                },
+            );
+        }
 
         self.draw(qh);
         self.first_configure = false;
