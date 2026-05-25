@@ -3,60 +3,60 @@ mod mem;
 
 use crossterm::event;
 
-use crate::{
-    cpu::{Cpu, init_cpu, update_cpu},
-    mem::{Mem, init_mem, update_mem},
+use ratatui::{
+    Frame,
+    layout::{Constraint, Layout},
+    style::{Color, Modifier, Stylize},
+    widgets::{Block, BorderType, Cell, Row, Table, Widget},
 };
-use std::time::{Duration, Instant};
 
+use crate::{cpu::Cpu, mem::Mem};
+use std::{sync::mpsc, thread, time::Duration};
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct App {
-    cpu: Cpu,
-    mem: Mem,
+    pub cpu_percent: f32,
+    pub mem: Mem,
     running: bool,
 }
 
-pub fn update_stats(app: &mut App) {
-    update_cpu(app);
-    update_mem(app);
+pub enum Update {
+    Cpu(f32),
+    Mem(Mem),
 }
 
-pub fn run_app(terminal: &mut ratatui::DefaultTerminal) -> std::io::Result<()> {
-    let cpu: Cpu = init_cpu();
-    let mem: Mem = init_mem();
+fn spawn_workers() -> mpsc::Receiver<Update> {
+    let (tx, rx) = mpsc::channel();
 
-    let mut app = App {
-        cpu,
-        mem,
-        running: true,
-    };
-
-    let tick_rate = Duration::from_secs(2);
-    let mut last_tick = Instant::now();
-
-    loop {
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or(Duration::ZERO);
-
-        if !app.running {
-            break Ok(());
+    let tx_cpu = tx.clone();
+    thread::spawn(move || {
+        let mut cpu = Cpu::new().unwrap();
+        loop {
+            thread::sleep(Duration::from_secs(2));
+            let pct = cpu.tick().unwrap();
+            if tx_cpu.send(Update::Cpu(pct)).is_err() {
+                break;
+            }
         }
+    });
 
-        if event::poll(timeout)? && event::read()?.is_key_press() {
-            break Ok(());
+    let tx_mem = tx.clone();
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(2));
+            match Mem::read() {
+                Ok(mem) => {
+                    if tx_mem.send(Update::Mem(mem)).is_err() {
+                        break;
+                    }
+                }
+                Err(_) => continue,
+            }
         }
+    });
 
-        if last_tick.elapsed() >= tick_rate {
-            update_stats(&mut app);
-            // println!("CPU: {}", &app.cpu.percent_free);
-            println!("MEM: {}", &app.mem.mem_total);
-            last_tick = Instant::now();
-        }
-
-        terminal
-            .draw(|frame| frame.render_widget("Hello World!", frame.area()))
-            .unwrap();
-    }
+    drop(tx);
+    rx
 }
 
 fn main() -> std::io::Result<()> {
@@ -64,4 +64,91 @@ fn main() -> std::io::Result<()> {
     let result = run_app(&mut terminal);
     ratatui::restore();
     result
+}
+
+pub fn run_app(terminal: &mut ratatui::DefaultTerminal) -> std::io::Result<()> {
+    let mut app = App {
+        running: true,
+        ..Default::default()
+    };
+
+    let rx = spawn_workers();
+    terminal.draw(|f| render(f, &app))?;
+    loop {
+        if !app.running {
+            break Ok(());
+        }
+        while let Ok(update) = rx.try_recv() {
+            match update {
+                Update::Cpu(pct) => app.cpu_percent = pct,
+                Update::Mem(m) => app.mem = m,
+            }
+        }
+        if event::poll(Duration::from_millis(100))? && event::read()?.is_key_press() {
+            break Ok(());
+        }
+        terminal.draw(|f| render(f, &app))?;
+    }
+}
+
+fn render(frame: &mut Frame, app: &App) {
+    let [border_area] = Layout::vertical([Constraint::Fill(1)])
+        .margin(1)
+        .areas(frame.area());
+    let [inner_area] = Layout::vertical([Constraint::Fill(1)])
+        .margin(1)
+        .areas(border_area);
+
+    Block::bordered()
+        .border_type(BorderType::Rounded)
+        .fg(Color::Green)
+        .render(border_area, frame.buffer_mut());
+
+    let mut rows = Vec::new();
+
+    /* CPU header */
+    rows.push(Row::new(vec![
+        Cell::from("CPU")
+            .add_modifier(Modifier::BOLD)
+            .fg(Color::Yellow),
+        Cell::from(""),
+    ]));
+
+    /* CPU metrics */
+    rows.push(Row::new(vec![
+        Cell::from(" % Used"),
+        Cell::from(format!("{:.2}%", app.cpu_percent)),
+    ]));
+
+    rows.push(Row::new(vec![
+        Cell::from("────────────────────────").fg(Color::DarkGray),
+        Cell::from("────────────────────────").fg(Color::DarkGray),
+    ]));
+
+    /* Memory header */
+    rows.push(Row::new(vec![
+        Cell::from("Memory")
+            .add_modifier(Modifier::BOLD)
+            .fg(Color::Yellow),
+        Cell::from(""),
+    ]));
+
+    let (mem_total, total_ab) = Mem::format_bytes(app.mem.mem_total);
+    let (mem_aval, aval_ab) = Mem::format_bytes(app.mem.mem_avail);
+
+    /* Memory metrics */
+    rows.push(Row::new(vec![
+        Cell::from(" Total"),
+        Cell::from(format!("{:.2} {}", mem_total, total_ab)),
+    ]));
+
+    rows.push(Row::new(vec![
+        Cell::from(" Free"),
+        Cell::from(format!("{:.2} {}", mem_aval, aval_ab)),
+    ]));
+
+    let widths = [Constraint::Percentage(40), Constraint::Percentage(60)];
+    let table = Table::new(rows, widths).block(Block::default());
+
+    frame.render_widget(table, inner_area);
 }
