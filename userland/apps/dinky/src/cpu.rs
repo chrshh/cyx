@@ -2,6 +2,10 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 
 #[derive(Debug, Copy, Clone, Default)]
+pub struct CpuStats {
+    pub percent_used: f32,
+}
+
 pub struct Cpu {
     pub prev_total: u64,
     pub prev_idle: u64,
@@ -39,7 +43,7 @@ impl Cpu {
         })
     }
 
-    pub fn tick(&mut self) -> io::Result<f32> {
+    pub fn tick(&mut self) -> io::Result<CpuStats> {
         let (idle, total) = Self::sample()?;
         let total_delta = total.saturating_sub(self.prev_total) as f32;
         let idle_delta = idle.saturating_sub(self.prev_idle) as f32;
@@ -52,6 +56,6 @@ impl Cpu {
             0.0
         };
 
-        Ok(percent_used)
+        Ok(CpuStats { percent_used })
     }
 }

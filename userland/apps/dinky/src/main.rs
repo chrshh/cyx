@@ -1,5 +1,6 @@
 mod cpu;
 mod mem;
+mod uptime;
 
 use crossterm::event;
 
@@ -10,40 +11,47 @@ use ratatui::{
     widgets::{Block, BorderType, Cell, Row, Table, Widget},
 };
 
-use crate::{cpu::Cpu, mem::Mem};
+use crate::{
+    cpu::{Cpu, CpuStats},
+    mem::Mem,
+    uptime::Uptime,
+};
 use std::{sync::mpsc, thread, time::Duration};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct App {
-    pub cpu_percent: f32,
+    pub cpu: CpuStats,
     pub mem: Mem,
+    pub uptime: Uptime,
     running: bool,
 }
 
 pub enum Update {
-    Cpu(f32),
+    Cpu(CpuStats),
     Mem(Mem),
+    Uptime(Uptime),
 }
 
 fn spawn_workers() -> mpsc::Receiver<Update> {
     let (tx, rx) = mpsc::channel();
 
+    /* cpu */
     let tx_cpu = tx.clone();
     thread::spawn(move || {
         let mut cpu = Cpu::new().unwrap();
         loop {
-            thread::sleep(Duration::from_secs(2));
             let pct = cpu.tick().unwrap();
             if tx_cpu.send(Update::Cpu(pct)).is_err() {
                 break;
             }
+            thread::sleep(Duration::from_secs(1));
         }
     });
 
+    /* mem */
     let tx_mem = tx.clone();
     thread::spawn(move || {
         loop {
-            thread::sleep(Duration::from_secs(2));
             match Mem::read() {
                 Ok(mem) => {
                     if tx_mem.send(Update::Mem(mem)).is_err() {
@@ -52,6 +60,23 @@ fn spawn_workers() -> mpsc::Receiver<Update> {
                 }
                 Err(_) => continue,
             }
+            thread::sleep(Duration::from_secs(1));
+        }
+    });
+
+    /* uptime */
+    let tx_uptime = tx.clone();
+    thread::spawn(move || {
+        loop {
+            match Uptime::read() {
+                Ok(uptime) => {
+                    if tx_uptime.send(Update::Uptime(uptime)).is_err() {
+                        break;
+                    }
+                }
+                Err(_) => continue,
+            }
+            thread::sleep(Duration::from_secs(1));
         }
     });
 
@@ -80,11 +105,12 @@ pub fn run_app(terminal: &mut ratatui::DefaultTerminal) -> std::io::Result<()> {
         }
         while let Ok(update) = rx.try_recv() {
             match update {
-                Update::Cpu(pct) => app.cpu_percent = pct,
+                Update::Cpu(c) => app.cpu = c,
                 Update::Mem(m) => app.mem = m,
+                Update::Uptime(u) => app.uptime = u,
             }
         }
-        if event::poll(Duration::from_millis(100))? && event::read()?.is_key_press() {
+        if event::poll(Duration::from_millis(1000))? && event::read()?.is_key_press() {
             break Ok(());
         }
         terminal.draw(|f| render(f, &app))?;
@@ -117,7 +143,7 @@ fn render(frame: &mut Frame, app: &App) {
     /* CPU metrics */
     rows.push(Row::new(vec![
         Cell::from(" % Used"),
-        Cell::from(format!("{:.2}%", app.cpu_percent)),
+        Cell::from(format!("{:.2}%", app.cpu.percent_used)),
     ]));
 
     rows.push(Row::new(vec![
@@ -145,6 +171,35 @@ fn render(frame: &mut Frame, app: &App) {
     rows.push(Row::new(vec![
         Cell::from(" Free"),
         Cell::from(format!("{:.2} {}", mem_aval, aval_ab)),
+    ]));
+
+    /* Uptime header */
+    rows.push(Row::new(vec![
+        Cell::from("Uptime")
+            .add_modifier(Modifier::BOLD)
+            .fg(Color::Yellow),
+        Cell::from(""),
+    ]));
+
+    rows.push(Row::new(vec![
+        Cell::from("────────────────────────").fg(Color::DarkGray),
+        Cell::from("────────────────────────").fg(Color::DarkGray),
+    ]));
+
+    let upt: String = Uptime::format_uptime(app.uptime.total_uptime);
+
+    /* Uptime metrics */
+    rows.push(Row::new(vec![
+        Cell::from(" Uptime"),
+        Cell::from(upt.to_string()),
+    ]));
+
+    rows.push(Row::new(vec![
+        Cell::from(" Current/Total"),
+        Cell::from(format!(
+            "{}/{}",
+            app.uptime.current_execs, app.uptime.total_execs
+        )),
     ]));
 
     let widths = [Constraint::Percentage(40), Constraint::Percentage(60)];
