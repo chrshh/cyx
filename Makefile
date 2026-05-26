@@ -1,10 +1,11 @@
-.PHONY: all clean clean-data clean-all init cjsh display cmd squishy textr build-image image run run-shell-only run-graphical run-graphical-shell-only run-g run-gs
+.PHONY: all clean clean-data clean-all init cjsh display cmd squishy textr dinky build-image image run run-shell-only run-graphical run-graphical-shell-only run-g run-gs
 ROOT      := $(CURDIR)
 BUILD     := $(ROOT)/build
 USERLAND  := $(ROOT)/userland
 DISK      := $(ROOT)/disk
 DOCKER_IMAGE := cjyx-static
 SQUISHY_SRC := $(USERLAND)/apps/squishy
+DINKY_SRC   := $(USERLAND)/apps/dinky
 # Our own kernel — built from kernel/src with virtio_gpu, bochs, ext4, etc all
 # compiled in (no module loading infrastructure in this OS).
 KERNEL := $(ROOT)/kernel/src/arch/x86/boot/bzImage
@@ -47,6 +48,7 @@ cjsh: $(BUILD)/cjsh
 display: $(BUILD)/display
 squishy: $(BUILD)/squishy
 textr: $(BUILD)/textr
+dinky: $(BUILD)/dinky
 
 build-image:
 	docker build \
@@ -76,6 +78,11 @@ $(BUILD)/textr: build-image | $(BUILD)
 $(BUILD)/squishy: $(SQUISHY_SRC)/build.py $(SQUISHY_SRC)/Dockerfile.build $(SQUISHY_SRC)/Cargo.toml $(SQUISHY_SRC)/Cargo.lock $(wildcard $(SQUISHY_SRC)/src/*.rs) $(wildcard $(SQUISHY_SRC)/assets/*) | $(BUILD)
 	python3 $(SQUISHY_SRC)/build.py $(BUILD)/squishy
 
+# Same Rust-in-docker pattern as squishy. Dinky's builder image is leaner
+# (no xkbcommon-dev — ratatui + crossterm are pure Rust).
+$(BUILD)/dinky: $(DINKY_SRC)/build.py $(DINKY_SRC)/Dockerfile.build $(DINKY_SRC)/Cargo.toml $(DINKY_SRC)/Cargo.lock $(wildcard $(DINKY_SRC)/src/*.rs) | $(BUILD)
+	python3 $(DINKY_SRC)/build.py $(BUILD)/dinky
+
 # Full Debian userland: docker export gives us a tarball of the entire image
 # filesystem, which includes Mesa drivers, GTK/Qt libs, foot terminal,
 # Xwayland, dbus-daemon, seatd, etc. — everything a real userland needs.
@@ -101,7 +108,7 @@ cmd: build-image | $(BUILD)
 	  docker cp $$cid:/cjyx/cmd/bin $(BUILD)/cmd; \
 	  docker rm $$cid >/dev/null
 
-image: $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr cmd $(BUILD)/.debian_rootfs $(DATA)
+image: $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky cmd $(BUILD)/.debian_rootfs $(DATA)
 	$(MAKE) -C $(DISK) image
 
 run: image
@@ -119,7 +126,7 @@ run-gs: run-graphical-shell-only
 clean:
 	$(MAKE) -C $(USERLAND) clean
 	$(MAKE) -C $(DISK) clean
-	rm -rf $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/cmd $(BUILD)/disk.img
+	rm -rf $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky $(BUILD)/cmd $(BUILD)/disk.img
 
 clean-data:
 	rm -f $(DATA)

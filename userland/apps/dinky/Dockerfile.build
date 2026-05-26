@@ -1,0 +1,11 @@
+# Toolchain image for building dinky (Rust TUI resource monitor).
+#
+# Uses rust:1-bookworm so the produced binary links against Debian
+# bookworm's glibc (2.36) — the same glibc baked into our guest's Debian
+# userland. Building on the Arch host would link against glibc 2.43 and
+# fail to run inside the guest. Dinky has no C-library dependencies
+# (ratatui + crossterm are pure Rust), so we don't need to apt-install
+# anything beyond what the rust image already ships.
+FROM rust:1-bookworm
+
+WORKDIR /work
