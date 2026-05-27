@@ -3,13 +3,23 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::process;
 
+use crate::http_req::HttpRequest;
+
+mod http_req;
+
+/*
+* yoink    [-FLAGS]     [PARAMS]      [ENDPOINT]
+* yoink       -o        page.html  https://example.com
+*/
+
 fn main() {
-    // yoink get htt://google.com
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         eprintln!("usage: yoink <url>");
         process::exit(1);
     }
+
+    let req = Some(HttpRequest::new(&args));
 
     let url = &args[1];
 
