@@ -1,1 +1,1 @@
-### Linux distro with custom userspace
+### I'm making my own linux distro from scratch ig
