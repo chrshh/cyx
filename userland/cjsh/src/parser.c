@@ -2,6 +2,7 @@
 #include <str/string.h>
 #include <parser.h>
 #include <core/memory.h>
+#include <core/warn.h>
 #include <stdio.h>
 #include <exec.h>
 #include <stdlib.h>
@@ -109,12 +110,11 @@ ASTNode *parsePipelineCmd(ParserState *psr) {
 ASTNode *parseSimpleCmd(ParserState *psr) {
   if (psr->pos >= psr->numTokens) return NULL;
   ASTNode *node = cmalloc(sizeof(ASTNode));
-  SimpleCmd cmd;
-  cmd.numArgs = 0;
+  SimpleCmd cmd = {0};
   cmd.args = cmalloc(psr->numTokens * sizeof(WordPart *));
 
   while (psr->pos < psr->numTokens) {
-    if (psr->tokens[psr->pos].lexeme == PIPE || psr->tokens[psr->pos].lexeme == SEMICOLON) break;
+    if (psr->tokens[psr->pos].lexeme == PIPE || psr->tokens[psr->pos].lexeme == SEMICOLON || psr->tokens[psr->pos].lexeme == GREATER || psr->tokens[psr->pos].lexeme == GREATER_GREATER) break;
     WordPart *word = parseWrd(psr);
     if (word == NULL) {
       return NULL;
@@ -149,9 +149,27 @@ ASTNode *parseSimpleCmd(ParserState *psr) {
     cmd.numArgs++;
   }
 
+  while (psr->pos < psr->numTokens &&
+         (psr->tokens[psr->pos].lexeme == GREATER ||
+          psr->tokens[psr->pos].lexeme == GREATER_GREATER)) {
+    bool isAppend = (psr->tokens[psr->pos].lexeme == GREATER_GREATER);
+    psr->pos++;
+
+    if (psr->pos >= psr->numTokens || (psr->tokens[psr->pos].lexeme != WORD && psr->tokens[psr->pos].lexeme != STRING)) {
+      warn("expected filename after redirect\n");
+      return NULL;
+    }
+
+    if (isAppend) {
+      cmd.appendFile = psr->tokens[psr->pos].literal;
+    } else {
+      cmd.outFile = psr->tokens[psr->pos].literal;
+    }
+    psr->pos++;
+  }
+
   node->type = SIMPLE_CMD;
-  node->simpleCmd.args = cmd.args;
-  node->simpleCmd.numArgs = cmd.numArgs;
+  node->simpleCmd = cmd;
   return node;
 }
 

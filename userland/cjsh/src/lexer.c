@@ -31,7 +31,9 @@ void freeTokens(LexerState *lxr) {
     return;
   }
   for (size_t i = 0; i < lxr->numTokens; i++) {
-    cfree(lxr->tokens[i].literal);
+    if (lxr->tokens[i].literal != NULL) {
+      cfree(lxr->tokens[i].literal);
+    }
   }
 
   cfree(lxr->tokens);

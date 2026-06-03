@@ -32,6 +32,7 @@ ASTNode *parsePipelineCmd(ParserState *psr);
  */
 ASTNode *parseExport(ParserState *psr, Token currToken);
 WordPart *parseInterpolatedStr(ParserState *psr, Token currToken, WordPart *word);
+WordPart *parseRedirects(ParserState *psr, Token currToken);
 
 /**
  * This function builds the list of WordParts*

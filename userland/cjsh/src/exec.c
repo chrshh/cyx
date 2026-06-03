@@ -7,8 +7,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <core/warn.h>
 #include <builtins.h>
 #include <exec.h>
+#include <fcntl.h>
 
 volatile sig_atomic_t curr_ch_pid = -1;
 
@@ -49,6 +51,11 @@ int execSimpleCmd(SimpleCmd *node) {
   char **argv;
   pid_t pid;
   int wstatus;
+
+  if (node->outFile != NULL || node->appendFile != NULL) {
+    return execRedirectionCmd(node);
+  }
+
   argv = cmalloc((node->numArgs + 1) * sizeof(char *));
 
   for (usize i = 0; i < node->numArgs; i++) {
@@ -64,6 +71,74 @@ int execSimpleCmd(SimpleCmd *node) {
 
   pid = fork();
   if (pid == 0) {
+    execvp(argv[0], argv);
+    printf("cjsh: command not found\n");
+    return 1;
+  } else {
+    curr_ch_pid = pid;
+    waitpid(pid, &wstatus, WUNTRACED | WCONTINUED);
+    curr_ch_pid = 0;
+  }
+  FREE(argv);
+  return 0;
+}
+
+int execRedirectionCmd(SimpleCmd *node) {
+  char **argv;
+  pid_t pid;
+  int wstatus;
+  int fd = -1;
+
+  argv = cmalloc((node->numArgs + 1) * sizeof(char *));
+  for (usize i = 0; i < node->numArgs; i++) {
+    argv[i] = expandWord(node->args[i]);
+  }
+  argv[node->numArgs] = NULL;
+
+  for (size_t i = 0; i < builtins_len; i++) {
+    if (strcmp(builtins[i].name, argv[0]) == 0) {
+      int saved_fd = dup(STDOUT_FILENO);
+
+      if (node->appendFile != NULL) {
+        fd = open(node->appendFile, O_WRONLY | O_CREAT | O_APPEND, 0644);
+      } else {
+        fd = open(node->outFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      }
+
+      if (fd == -1) {
+        warn("failed to open redirect pipe");
+        close(saved_fd);
+        FREE(argv);
+        return -1;
+      }
+
+      dup2(fd, STDOUT_FILENO);
+      close(fd);
+
+      int result = builtins[i].fn(argv);
+
+      fflush(stdout);
+      dup2(saved_fd, STDOUT_FILENO);
+      close(saved_fd);
+      FREE(argv);
+      return result;
+    }
+  }
+
+  pid = fork();
+  if (pid == 0) {
+    if (node->appendFile != NULL) {
+      fd = open(node->appendFile, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    } else {
+      fd = open(node->outFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    }
+    if (fd == -1) {
+      warn("failed to open redirect pipe");
+      return 1;
+    }
+    dup2(fd, STDOUT_FILENO);
+    close(fd);
+
     execvp(argv[0], argv);
     printf("cjsh: command not found\n");
     return 1;
