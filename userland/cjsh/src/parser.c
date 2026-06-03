@@ -114,7 +114,13 @@ ASTNode *parseSimpleCmd(ParserState *psr) {
   cmd.args = cmalloc(psr->numTokens * sizeof(WordPart *));
 
   while (psr->pos < psr->numTokens) {
-    if (psr->tokens[psr->pos].lexeme == PIPE || psr->tokens[psr->pos].lexeme == SEMICOLON || psr->tokens[psr->pos].lexeme == GREATER || psr->tokens[psr->pos].lexeme == GREATER_GREATER) break;
+    if (
+        psr->tokens[psr->pos].lexeme == PIPE ||
+        psr->tokens[psr->pos].lexeme == SEMICOLON ||
+        psr->tokens[psr->pos].lexeme == GREATER ||
+        psr->tokens[psr->pos].lexeme == GREATER_GREATER ||
+        psr->tokens[psr->pos].lexeme == LESS) break;
+
     WordPart *word = parseWrd(psr);
     if (word == NULL) {
       return NULL;
@@ -151,8 +157,10 @@ ASTNode *parseSimpleCmd(ParserState *psr) {
 
   while (psr->pos < psr->numTokens &&
          (psr->tokens[psr->pos].lexeme == GREATER ||
-          psr->tokens[psr->pos].lexeme == GREATER_GREATER)) {
+          psr->tokens[psr->pos].lexeme == GREATER_GREATER ||
+          psr->tokens[psr->pos].lexeme == LESS)) {
     bool isAppend = (psr->tokens[psr->pos].lexeme == GREATER_GREATER);
+    bool isInFile = (psr->tokens[psr->pos].lexeme == LESS);
     psr->pos++;
 
     if (psr->pos >= psr->numTokens || (psr->tokens[psr->pos].lexeme != WORD && psr->tokens[psr->pos].lexeme != STRING)) {
@@ -162,6 +170,8 @@ ASTNode *parseSimpleCmd(ParserState *psr) {
 
     if (isAppend) {
       cmd.appendFile = psr->tokens[psr->pos].literal;
+    } else if (isInFile) {
+      cmd.inFile = psr->tokens[psr->pos].literal;
     } else {
       cmd.outFile = psr->tokens[psr->pos].literal;
     }
