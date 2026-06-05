@@ -1,4 +1,4 @@
-.PHONY: all clean rootfs image stage-cmd size
+.PHONY: all clean rootfs image stage-cmd stage-cmd-rs size
 
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
@@ -14,6 +14,7 @@ SQUISHY := ../build/squishy
 TEXTR   := ../build/textr
 DINKY   := ../build/dinky
 CMDDIR  := ../build/cmd
+CMDRSDIR := ../build/cmd-rs
 IMAGE   := ../build/disk.img
 # 12G: Mesa + GTK + Qt + Xwayland + fonts + Debian baseline runs ~2.5GB
 # extracted; ext4 overhead + headroom for /home growth + apps you'll write.
@@ -30,7 +31,7 @@ init: cinit.c
 
 # Layered staging: Debian userland goes down first as the base, then our own
 # binaries and config files overlay on top. 
-rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display $(ROOTFS)/bin/squishy $(ROOTFS)/bin/textr $(ROOTFS)/bin/dinky stage-cmd $(ROOTFS)/etc/passwd
+rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display $(ROOTFS)/bin/squishy $(ROOTFS)/bin/textr $(ROOTFS)/bin/dinky stage-cmd stage-cmd-rs $(ROOTFS)/etc/passwd
 	mkdir -p $(ROOTFS)/dev $(ROOTFS)/proc $(ROOTFS)/sys $(ROOTFS)/tmp $(ROOTFS)/root $(ROOTFS)/home $(ROOTFS)/run
 
 # The marker file ensures we only extract and purge once. 
@@ -89,6 +90,17 @@ stage-cmd: $(ROOTFS)/.staged
 	mkdir -p $(ROOTFS)/bin
 	if [ -d $(CMDDIR) ]; then \
 		for f in $(CMDDIR)/*; do \
+			[ -f "$$f" ] && [ -x "$$f" ] && install -m 755 "$$f" $(ROOTFS)/bin/; \
+		done; \
+	fi
+
+# Same pattern as stage-cmd but for the Rust workspace output. Iterates
+# build/cmd-rs/ and installs every executable file into rootfs/bin. Safe to
+# run when the directory is empty (no Rust commands written yet).
+stage-cmd-rs: $(ROOTFS)/.staged
+	mkdir -p $(ROOTFS)/bin
+	if [ -d $(CMDRSDIR) ]; then \
+		for f in $(CMDRSDIR)/*; do \
 			[ -f "$$f" ] && [ -x "$$f" ] && install -m 755 "$$f" $(ROOTFS)/bin/; \
 		done; \
 	fi

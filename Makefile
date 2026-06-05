@@ -1,4 +1,4 @@
-.PHONY: all clean clean-data clean-all init cjsh display cmd squishy textr dinky build-image image run run-shell-only run-graphical run-graphical-shell-only run-g run-gs
+.PHONY: all clean clean-data clean-all init cjsh display cmd cmd-rs squishy textr dinky build-image image run run-shell-only run-graphical run-graphical-shell-only run-g run-gs
 ROOT      := $(CURDIR)
 BUILD     := $(ROOT)/build
 USERLAND  := $(ROOT)/userland
@@ -6,6 +6,7 @@ DISK      := $(ROOT)/disk
 DOCKER_IMAGE := cjyx-static
 SQUISHY_SRC := $(USERLAND)/apps/squishy
 DINKY_SRC   := $(USERLAND)/apps/dinky
+CMDRS_SRC   := $(USERLAND)/cmd-rs
 # Our own kernel — built from kernel/src with virtio_gpu, bochs, ext4, etc all
 # compiled in (no module loading infrastructure in this OS).
 KERNEL := $(ROOT)/kernel/src/arch/x86/boot/bzImage
@@ -108,7 +109,16 @@ cmd: build-image | $(BUILD)
 	  docker cp $$cid:/cjyx/cmd/bin $(BUILD)/cmd; \
 	  docker rm $$cid >/dev/null
 
-image: $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky cmd $(BUILD)/.debian_rootfs $(DATA)
+# Rust workspace of coreutil-style commands. Same Rust-in-docker pattern as
+# squishy/dinky but produces N binaries (one per workspace member crate)
+# into build/cmd-rs/. The disk Makefile's stage-cmd-rs target installs each
+# one into rootfs/bin alongside the C commands from build/cmd/.
+cmd-rs: $(CMDRS_SRC)/build.py $(CMDRS_SRC)/Dockerfile.build $(CMDRS_SRC)/Cargo.toml $(wildcard $(CMDRS_SRC)/*/Cargo.toml) $(wildcard $(CMDRS_SRC)/*/src/*.rs) | $(BUILD)
+	rm -rf $(BUILD)/cmd-rs
+	mkdir -p $(BUILD)/cmd-rs
+	python3 $(CMDRS_SRC)/build.py $(BUILD)/cmd-rs
+
+image: $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky cmd cmd-rs $(BUILD)/.debian_rootfs $(DATA)
 	$(MAKE) -C $(DISK) image
 
 run: image
@@ -126,7 +136,7 @@ run-gs: run-graphical-shell-only
 clean:
 	$(MAKE) -C $(USERLAND) clean
 	$(MAKE) -C $(DISK) clean
-	rm -rf $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky $(BUILD)/cmd $(BUILD)/disk.img
+	rm -rf $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky $(BUILD)/cmd $(BUILD)/cmd-rs $(BUILD)/cmd-rs-target $(BUILD)/disk.img
 
 clean-data:
 	rm -f $(DATA)

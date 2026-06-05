@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["*"]
+exclude = ["target"]
+
+# Add a new command:
+#   cd userland/cmd-rs
+#   cargo new --vcs none --bin <name>
+# The members = ["*"] glob picks it up automatically. Each crate produces
+# one binary named after the crate; build.py harvests every release
+# executable and installs it into build/cmd-rs/ for the disk image.
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
