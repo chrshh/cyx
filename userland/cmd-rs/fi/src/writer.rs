@@ -3,12 +3,12 @@ use crate::{
     parse::Config,
     search::SearchResult,
 };
-use std::fmt::Write;
+use std::{fmt::Write as _, io::Write};
 
-// \x1b[32m sets text to green
-// \x1b[0m resets the color to default
 #[derive(Debug, Default)]
-pub struct Output;
+pub struct Output {
+    buf: String,
+}
 
 impl Output {
     const GREEN: &'static str = "\x1b[32m";
@@ -16,19 +16,36 @@ impl Output {
     const RED: &'static str = "\x1b[31m";
     const RESET: &'static str = "\x1b[0m";
 
-    pub fn print_match(r: SearchResult, c: &Config) {
-        let mut out = String::new();
-
+    pub fn push_match(&mut self, r: SearchResult, c: &Config) {
         if c.flags & RECURSIVE != 0 {
-            write!(out, "{}{}{}:", Output::PURPLE, r.filepath, Output::RESET).unwrap();
+            write!(
+                self.buf,
+                "{}{}{}:",
+                Output::PURPLE,
+                r.filepath,
+                Output::RESET
+            )
+            .unwrap();
         }
 
         if c.flags & LN_NUMS != 0 {
-            write!(out, "{}{}{}:\t", Output::GREEN, r.line_num, Output::RESET).unwrap();
+            write!(
+                self.buf,
+                "{}{}{}:\t",
+                Output::GREEN,
+                r.line_num,
+                Output::RESET
+            )
+            .unwrap();
         }
 
-        write!(out, "{}{}{}", Output::RED, r.complement, Output::RESET).unwrap();
+        writeln!(self.buf, "{}{}{}", Output::RED, r.complement, Output::RESET).unwrap();
+    }
 
-        println!("{}", out);
+    pub fn flush_to<W: Write>(&mut self, out: &mut W) {
+        if !self.buf.is_empty() {
+            out.write_all(self.buf.as_bytes()).unwrap();
+            self.buf.clear();
+        }
     }
 }

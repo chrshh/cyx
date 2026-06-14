@@ -1,3 +1,4 @@
+#![recursion_limit = "512"]
 use std::{env::args, process::ExitCode};
 
 use crate::{error::CGrepError, parse::parse_args, search::search};
@@ -7,7 +8,6 @@ mod flags;
 mod parse;
 mod search;
 mod writer;
-
 fn main() -> ExitCode {
     match run() {
         Ok(true) => ExitCode::SUCCESS,
