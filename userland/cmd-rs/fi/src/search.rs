@@ -68,6 +68,9 @@ pub fn search_dir<W: Write + Send + 'static>(
 ) -> Result<bool, CGrepError> {
     for entry in read_dir(path).unwrap() {
         let entry = entry.unwrap();
+        if skip_entry(&entry.path()) {
+            continue;
+        }
         if entry.path().is_file() {
             let entry = entry.path();
             let out_clone = Arc::clone(out);
@@ -113,6 +116,57 @@ pub fn search_file<W: Write>(path: &str, cfg: &Config, out: &mut W) -> Result<bo
     Ok(found)
 }
 
+/* returns true if condition is met to skip entry */
+pub fn skip_entry(entry: &Path) -> bool {
+    let skip = false;
+    /* dotfile check */
+    if skip | is_dotfile(entry) {
+        return true;
+    }
+    /* rust built output check */
+    if skip | is_rs_target_dir(entry) {
+        return true;
+    }
+    /* node_modules dir check */
+    if skip | is_node_mods_dir(entry) {
+        return true;
+    }
+    skip
+}
+
+/* returns true if entry begins with '.' */
+pub fn is_dotfile(entry: &Path) -> bool {
+    let dotfile_count = entry
+        .to_str()
+        .unwrap()
+        .split('/')
+        .filter(|f| f.starts_with('.'))
+        .count();
+    dotfile_count > 0
+}
+
+/* returns true if entry is the rust build output directory */
+pub fn is_rs_target_dir(entry: &Path) -> bool {
+    let target_dir_count = entry
+        .to_str()
+        .unwrap()
+        .split('/')
+        .filter(|f| f.contains("target"))
+        .count();
+    target_dir_count > 0
+}
+
+pub fn is_node_mods_dir(entry: &Path) -> bool {
+    let node_mods_dir_count = entry
+        .to_str()
+        .unwrap()
+        .split('/')
+        .filter(|f| f.contains("node_modules"))
+        .count();
+    node_mods_dir_count > 0
+}
+
+/* XXX extend this method to determine result based on input flags */
 pub fn matches(line: &str, pattern: &str) -> bool {
     line.contains(pattern)
 }
