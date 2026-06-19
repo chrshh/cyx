@@ -9,6 +9,7 @@ pub enum CGrepError {
     NotFound(String),
     IsDir(String),
     IOError(io::Error),
+    PoolInitError,
 }
 
 impl fmt::Display for CGrepError {
@@ -20,6 +21,7 @@ impl fmt::Display for CGrepError {
             CGrepError::UnknownFlag(flag) => write!(f, "cgrep: unknown flag: -{}", flag),
             CGrepError::NotFound(haystack) => write!(f, "cgrep: file does not exist: {}", haystack),
             CGrepError::IsDir(haystack) => write!(f, "cgrep: {} is a directory", haystack),
+            CGrepError::PoolInitError => write!(f, "cgrep: failed to create thread pool"),
         }
     }
 }

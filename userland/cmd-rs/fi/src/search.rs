@@ -2,9 +2,14 @@ use std::{
     fs::{File, metadata, read_dir, read_to_string},
     io::{self, BufWriter, Read, Write, stdout},
     path::Path,
+    sync::{Arc, Mutex, atomic::Ordering},
+    time::Instant,
 };
 
-use crate::{error::CGrepError, flags::RECURSIVE, parse::Config, writer::Output};
+use crate::{
+    MATCH_FOUND, error::CGrepError, flags::RECURSIVE, parse::Config, thread::ThreadPool,
+    writer::Output,
+};
 
 pub struct SearchResult {
     pub filepath: String,
@@ -23,7 +28,7 @@ impl SearchResult {
 }
 
 /* main entry point for searching */
-pub fn search(cfg: &Config) -> Result<bool, CGrepError> {
+pub fn search(cfg: Arc<Config>, start: Instant) -> Result<bool, CGrepError> {
     if !Path::new(&cfg.path).exists() {
         return Err(CGrepError::NotFound(cfg.path.clone()));
     }
@@ -33,37 +38,52 @@ pub fn search(cfg: &Config) -> Result<bool, CGrepError> {
         return Err(CGrepError::IsDir(cfg.path.clone()));
     }
 
-    let mut out = BufWriter::new(stdout().lock());
+    let out = Arc::new(Mutex::new(BufWriter::new(stdout())));
 
     let found = if meta.is_dir() {
-        search_dir(&cfg.path, cfg, &mut out)?
+        let tp = ThreadPool::new()?;
+        search_dir(&cfg.path, &Arc::clone(&cfg), &tp, &out)?
     } else {
-        search_file(&cfg.path, cfg, &mut out)?
+        let mut guard = out.lock().unwrap();
+        search_file(&cfg.path, &cfg, &mut *guard)?
     };
+
+    /* print info that can only exist after execution of program is complete */
+    let end = start.elapsed();
+    let out_copy = Arc::clone(&out);
+    let mut guard = out_copy.lock().unwrap();
+    let mut w = Output::default();
+    Output::post_search_output(&mut w, &cfg, end);
+    Output::flush_to(&mut w, &mut *guard);
 
     Ok(found)
 }
 
 /* iterates through entries and calls search_file when a file is found */
-pub fn search_dir<W: Write>(path: &str, cfg: &Config, out: &mut W) -> Result<bool, CGrepError> {
-    let mut found = false;
-
-    for entry in read_dir(path)? {
-        let entry = entry?;
+pub fn search_dir<W: Write + Send + 'static>(
+    path: &str,
+    cfg: &Arc<Config>,
+    tp: &ThreadPool,
+    out: &Arc<Mutex<W>>,
+) -> Result<bool, CGrepError> {
+    for entry in read_dir(path).unwrap() {
+        let entry = entry.unwrap();
         if entry.path().is_file() {
-            found |= search_file(entry.path().to_str().unwrap(), cfg, out)?;
+            let entry = entry.path();
+            let out_clone = Arc::clone(out);
+            let cfg = Arc::clone(cfg);
+            tp.execute(move || {
+                let mut guard = out_clone.lock().unwrap();
+                search_file(entry.to_str().unwrap(), &cfg, &mut *guard).unwrap();
+            });
         } else {
-            found |= search_dir(entry.path().to_str().unwrap(), cfg, out)?;
+            search_dir(entry.path().to_str().unwrap(), cfg, tp, out).unwrap();
         }
     }
-    Ok(found)
+    Ok(true)
 }
 
-pub fn search_file<W: Write>(
-    path: &str,
-    cfg: &Config,
-    mut out: &mut W,
-) -> Result<bool, CGrepError> {
+pub fn search_file<W: Write>(path: &str, cfg: &Config, out: &mut W) -> Result<bool, CGrepError> {
     /* skips binary files and returns false */
     let mut found = false;
     if is_binary_heuristic(path)? {
@@ -79,7 +99,8 @@ pub fn search_file<W: Write>(
     };
 
     for (i, line) in contents.lines().enumerate() {
-        if matches(line, &cfg.pattern) {
+        if matches(line, Config::as_ref(cfg)) {
+            set_success_exit_code();
             Output::push_match(
                 &mut w,
                 SearchResult::new(String::from(path), String::from(line), i + 1),
@@ -88,7 +109,7 @@ pub fn search_file<W: Write>(
             found = true;
         }
     }
-    w.flush_to(&mut out);
+    w.flush_to(out);
     Ok(found)
 }
 
@@ -103,4 +124,8 @@ pub fn is_binary_heuristic(path: &str) -> io::Result<bool> {
 
     let has_null = buffer[..bytes_read].contains(&0);
     Ok(has_null)
+}
+
+pub fn set_success_exit_code() {
+    MATCH_FOUND.store(true, Ordering::Relaxed);
 }

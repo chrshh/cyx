@@ -1,9 +1,10 @@
 use crate::{
-    flags::{LN_NUMS, RECURSIVE},
+    MATCH_FOUND,
+    flags::{LN_NUMS, RECURSIVE, TIME},
     parse::Config,
     search::SearchResult,
 };
-use std::{fmt::Write as _, io::Write};
+use std::{fmt::Write as _, io::Write, sync::atomic::Ordering, time::Duration};
 
 #[derive(Debug, Default)]
 pub struct Output {
@@ -14,6 +15,7 @@ impl Output {
     const GREEN: &'static str = "\x1b[32m";
     const PURPLE: &'static str = "\x1b[35m";
     const RED: &'static str = "\x1b[31m";
+    const YELLOW: &'static str = "\x1b[33m";
     const RESET: &'static str = "\x1b[0m";
 
     pub fn push_match(&mut self, r: SearchResult, c: &Config) {
@@ -46,6 +48,23 @@ impl Output {
         if !self.buf.is_empty() {
             out.write_all(self.buf.as_bytes()).unwrap();
             self.buf.clear();
+        }
+    }
+
+    pub fn post_search_output(&mut self, c: &Config, end: Duration) {
+        if c.flags & TIME != 0 {
+            writeln!(
+                self.buf,
+                "cgrep: Query time: {}{:?}{}",
+                Output::YELLOW,
+                end,
+                Output::RESET
+            )
+            .unwrap();
+        }
+
+        if !MATCH_FOUND.load(Ordering::Relaxed) {
+            writeln!(self.buf, "cgrep: no matches found").unwrap();
         }
     }
 }

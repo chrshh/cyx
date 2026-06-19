@@ -7,11 +7,17 @@ use crate::{
     flags::{FlagConfig, parse_flags},
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Config {
     pub pattern: String,
     pub path: String,
     pub flags: u32,
+}
+
+impl AsRef<str> for Config {
+    fn as_ref(&self) -> &str {
+        &self.pattern
+    }
 }
 
 /* extracts out correct flags, pattern, and path based on positioning */

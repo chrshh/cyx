@@ -6,6 +6,7 @@ pub const WHOLE_WORD: u32 = 1 << 2;
 pub const LN_NUMS: u32 = 1 << 3;
 pub const COUNT: u32 = 1 << 4;
 pub const FILENAME_ONLY: u32 = 1 << 5;
+pub const TIME: u32 = 1 << 6;
 
 pub enum FlagConfig {
     Flags,
@@ -44,6 +45,7 @@ pub fn parse_flags(flags: &str) -> Result<u32, CGrepError> {
             'n' => f |= LN_NUMS,
             'c' => f |= COUNT,
             'l' => f |= FILENAME_ONLY,
+            't' => f |= TIME,
             other => return Err(CGrepError::UnknownFlag(String::from(other))),
         }
     }
