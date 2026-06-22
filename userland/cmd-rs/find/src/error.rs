@@ -5,7 +5,6 @@ use std::{error::Error, io};
 pub enum CFindError {
     PatternMissing,
     UnknownFlag(String),
-    MissingFlag,
     IOError(io::Error),
     PoolInitError,
     UnkownEntryType(String),
@@ -18,7 +17,6 @@ impl fmt::Display for CFindError {
         match self {
             CFindError::PatternMissing => write!(f, "cfind: missing search pattern"),
             CFindError::UnknownFlag(flag) => write!(f, "cfind: unknown flag: -{}", flag),
-            CFindError::MissingFlag => write!(f, "cfind: flag symbol found with no flag"),
             CFindError::IOError(e) => write!(f, "cfind: IO error: {}", e),
             CFindError::PoolInitError => write!(f, "cfind: failed to create thread pool"),
             CFindError::UnkownEntryType(t) => write!(f, "cfind: unknown entry type: {}", t),

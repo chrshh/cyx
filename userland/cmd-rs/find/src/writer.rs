@@ -7,31 +7,27 @@ pub struct Output {
 }
 
 impl Output {
-    const GREEN: &'static str = "\x1b[32m";
-    const PURPLE: &'static str = "\x1b[35m";
     const RED: &'static str = "\x1b[31m";
-    const YELLOW: &'static str = "\x1b[33m";
     const RESET: &'static str = "\x1b[0m";
 
     pub fn push_match(&mut self, r: SearchResult, c: &Config) {
+        let pattern = c.pattern.as_deref().unwrap_or("");
         writeln!(
             self.buf,
             "{}",
-            self.highlight_match(
-                &mut r.filepath.clone(),
-                c.pattern.clone().unwrap().as_mut_str()
-            ),
+            self.highlight_match(&r.filepath, pattern),
         )
         .unwrap();
     }
 
-    pub fn highlight_match(&self, line: &mut str, pattern: &str) -> String {
-        let line = &line.replace(
+    pub fn highlight_match(&self, line: &str, pattern: &str) -> String {
+        if pattern.is_empty() {
+            return line.to_string();
+        }
+        line.replace(
             pattern,
             &format!("{}{}{}", Output::RED, pattern, Output::RESET),
-        );
-
-        String::from(line)
+        )
     }
 
     pub fn post_search_output(&mut self) {

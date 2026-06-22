@@ -13,39 +13,46 @@ pub struct Config {
 
 pub fn parse_args(raw_args: &[String]) -> Result<Config, CFindError> {
     /* EXAMPLES */
-    // cfd
-    // cfd <pattern>
-    // cfd -e log
-    // cfd -t <t> <pattern>
-    //
-    if raw_args.is_empty() {
-        return Err(CFindError::PatternMissing);
-    }
+    // cfd                   -> list everything from CWD
+    // cfd <pattern>         -> search CWD for entries whose name matches
+    // cfd <pattern> <path>  -> search <path> instead
+    // cfd -e log            -> all *.log entries under CWD
+    // cfd -t f <pattern>    -> only files
+    // cfd -t d <pattern>    -> only directories
+    // cfd -t x <pattern>    -> only executables
 
     let mut cfg = Config::default();
-    let args = parse_flags(&mut cfg, raw_args)?;
 
-    /* default root_path of current dir */
+    /* zero-arg form: list everything under CWD */
+    if raw_args.is_empty() {
+        cfg.flags |= ALL_FILES;
+        cfg.root_path = Some(String::from("."));
+        return Ok(cfg);
+    }
+
+    let positional = parse_flags(&mut cfg, raw_args)?;
+
+    /* If a flag (-e) already consumed the pattern, the next positional
+       is the optional root path. Otherwise the first positional is the
+       pattern and the second is the optional root path. */
+    let mut iter = positional.into_iter();
+    if cfg.pattern.is_none() {
+        if let Some(p) = iter.next() {
+            cfg.pattern = Some(p);
+        }
+    }
+    if let Some(rp) = iter.next() {
+        cfg.root_path = Some(rp);
+    }
+
     if cfg.root_path.is_none() {
         cfg.root_path = Some(String::from("."));
     }
 
-    /* only 'cfd' was entered  */
-    if cfg.flags & ALL_FILES != 0 {
-        return Ok(cfg);
+    /* no pattern + no -e -> list everything that passes the type filter */
+    if cfg.pattern.is_none() {
+        cfg.flags |= ALL_FILES;
     }
-
-    /* 'cfd + <pattern> + OPTIONAL<root_path>' */
-    if cfg.pattern.as_deref() == Some("") {
-        cfg.pattern = Some(args[0].clone());
-        if !args[1].is_empty() {
-            cfg.root_path = Some(args[1].clone());
-        }
-        return Ok(cfg);
-    }
-
-    println!("entry type: {:?}", cfg.entry_type);
-    println!("pattern from ext: {:?}", cfg.pattern);
 
     Ok(cfg)
 }
