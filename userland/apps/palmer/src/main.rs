@@ -11,7 +11,7 @@ fn main() -> Result<(), ()> {
 }
 
 fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
-    let app = App::new();
+    let mut app = App::new();
     loop {
         terminal.draw(|frame| app.render(frame))?;
         if crossterm::event::read()?.is_key_press() {
