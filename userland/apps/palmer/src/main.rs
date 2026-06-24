@@ -4,6 +4,7 @@ use crate::app::App;
 
 mod app;
 mod components;
+mod path;
 
 fn main() -> Result<(), ()> {
     ratatui::run(app).unwrap();

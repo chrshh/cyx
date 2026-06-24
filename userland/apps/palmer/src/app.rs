@@ -1,28 +1,43 @@
+use std::path::PathBuf;
+
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
 };
 
-use crate::components::{DirList, Statbar};
+use crate::components::{DirList, Preview, Statbar};
 
 pub struct App {
+    /* global state  */
+    pub cwd: PathBuf,
     /* ui components */
     pub parent: DirList,
     pub current: DirList,
-    pub preview: DirList,
+    pub preview: Preview,
     pub statbar: Statbar,
 }
 
 impl App {
     pub fn new() -> Self {
-        let current_dir = std::env::current_dir().unwrap();
-        let parent_path = current_dir.parent().unwrap_or(&current_dir).to_path_buf();
+        let cwd = std::env::current_dir().unwrap();
+        let parent = match cwd.parent() {
+            Some(p) => {
+                let name = cwd.file_name().and_then(|n| n.to_str());
+                DirList::with_highlight(p.to_path_buf(), name)
+            }
+            None => DirList::empty(),
+        };
+
+        let current = DirList::new(&cwd);
+        let preview = Preview::from(&cwd, &current);
+        let statbar = Statbar::new(&cwd);
 
         Self {
-            parent: DirList::new(&parent_path),
-            current: DirList::new(&current_dir),
-            preview: DirList::new(&current_dir),
-            statbar: Statbar::new(&current_dir),
+            cwd,
+            parent,
+            current,
+            preview,
+            statbar,
         }
     }
 

@@ -1,4 +1,7 @@
-use std::{fs::read_dir, path::PathBuf};
+use std::{
+    fs::read_dir,
+    path::{Path, PathBuf},
+};
 
 use ratatui::{
     Frame,
@@ -14,7 +17,7 @@ pub struct DirList {
 }
 
 impl DirList {
-    pub fn new(path: &PathBuf) -> Self {
+    pub fn new(path: &Path) -> Self {
         let entries: Vec<String> = read_dir(path)
             .map(|rd| {
                 rd.filter_map(|e| e.ok())
@@ -24,10 +27,33 @@ impl DirList {
             .unwrap_or_default();
 
         let mut selected = ListState::default();
-        if !entries.is_empty() {
-            selected.select(Some(0));
-        }
+        selected.select(Some(0));
         Self { entries, selected }
+    }
+
+    pub fn with_highlight(path: PathBuf, name: Option<&str>) -> Self {
+        if name.unwrap().is_empty() {
+            println!("ok");
+        }
+        let entries: Vec<String> = read_dir(&path)
+            .map(|rd| {
+                rd.filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let mut selected = ListState::default();
+        let idx = name.and_then(|n| entries.iter().position(|e| e == n));
+        selected.select(idx);
+
+        Self { entries, selected }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            entries: Vec::default(),
+            selected: ListState::default(),
+        }
     }
 
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {

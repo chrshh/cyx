@@ -1,3 +1,4 @@
+use crate::path::PathExt;
 use std::path::{Path, PathBuf};
 
 use ratatui::{
@@ -11,16 +12,11 @@ pub struct Statbar {
     pub current_dir: String,
 }
 
-pub fn format_cwd(cwd: &Path) -> String {
-    let prefix = "~/";
-    let rel_path: PathBuf = cwd.components().skip(3).collect();
-    prefix.to_string() + rel_path.to_str().unwrap()
-}
-
 impl Statbar {
-    pub fn new(current_dir: &Path) -> Self {
-        let current_dir = format_cwd(current_dir);
-        Self { current_dir }
+    pub fn new(cwd: &Path) -> Self {
+        Self {
+            current_dir: cwd.pretty(),
+        }
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
