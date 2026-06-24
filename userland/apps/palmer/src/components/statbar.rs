@@ -4,7 +4,8 @@ use std::path::Path;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    widgets::{Block, Borders, Paragraph},
+    style::{Color, Style},
+    widgets::{Block, Padding, Paragraph},
 };
 
 #[derive(Debug, Default)]
@@ -20,8 +21,7 @@ impl Statbar {
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
-        /* bottom border drawn first */
-        let block = Block::default().borders(Borders::BOTTOM);
+        let block = Block::default().padding(Padding::horizontal(1));
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
@@ -31,7 +31,9 @@ impl Statbar {
             .split(inner);
 
         frame.render_widget(
-            Paragraph::new(self.current_dir.as_str()).left_aligned(),
+            Paragraph::new(self.current_dir.as_str())
+                .style(Style::default().fg(Color::Cyan))
+                .left_aligned(),
             chunks[0],
         );
     }

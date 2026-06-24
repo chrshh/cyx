@@ -1,10 +1,6 @@
 use std::{fs::read_to_string, path::Path};
 
-use ratatui::{
-    Frame,
-    layout::Rect,
-    widgets::{Block, Borders, Paragraph},
-};
+use ratatui::{Frame, layout::Rect, widgets::Paragraph};
 
 use crate::{components::DirList, path::PathBufExt};
 
@@ -42,7 +38,7 @@ impl Preview {
             Preview::None => String::new(),
         };
 
-        let c = Paragraph::new(text).block(Block::default().borders(Borders::ALL));
+        let c = Paragraph::new(text);
         frame.render_widget(c, area);
     }
 }

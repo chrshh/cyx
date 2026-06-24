@@ -5,8 +5,9 @@ use crate::path::PathBufExt;
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, List, ListItem, ListState, Padding},
 };
 
 #[derive(Debug, Default)]
@@ -49,16 +50,43 @@ impl DirList {
         let items: Vec<ListItem> = self
             .entries
             .iter()
-            .map(|e| ListItem::new(e.as_str()))
+            .map(|e| {
+                // Check if it's a directory (simple check based on trailing slash,
+                // or adapt this to match your specific entry struct logic)
+                let is_dir = e.ends_with('/') || !e.contains('.');
+
+                let line = if is_dir {
+                    Line::from(vec![
+                        Span::styled(" ", Style::default().fg(Color::LightYellow)),
+                        Span::raw(e.as_str()),
+                    ])
+                } else {
+                    Line::from(vec![
+                        Span::styled(" ", Style::default().fg(Color::White)),
+                        Span::raw(e.as_str()),
+                    ])
+                };
+
+                ListItem::new(line)
+            })
             .collect();
 
         let list = List::new(items)
-            .block(Block::default().borders(Borders::ALL))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+            .block(
+                Block::default()
+                    .borders(Borders::RIGHT)
+                    .border_style(Style::default().fg(Color::DarkGray))
+                    .padding(Padding::left(2)),
+            )
+            .highlight_style(
+                Style::default()
+                    .bg(Color::White)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD),
+            );
 
         frame.render_stateful_widget(list, area, &mut self.selected);
     }
-
     /* max cursor: 0 , min cursor: entries.len - 1 */
     pub fn cursor_up(&mut self) {
         let pos = self.selected.selected().unwrap_or(0);

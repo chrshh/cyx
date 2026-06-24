@@ -45,7 +45,7 @@ impl App {
     pub fn render(&mut self, frame: &mut Frame) {
         let vertical = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(2), Constraint::Min(0)])
+            .constraints([Constraint::Length(1), Constraint::Min(1)])
             .split(frame.area());
 
         let statbar_area = vertical[0];
