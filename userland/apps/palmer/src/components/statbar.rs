@@ -1,5 +1,5 @@
 use crate::path::PathExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use ratatui::{
     Frame,

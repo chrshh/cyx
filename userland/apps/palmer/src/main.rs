@@ -15,7 +15,11 @@ fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
     let mut app = App::new();
     loop {
         terminal.draw(|frame| app.render(frame))?;
-        if crossterm::event::read()?.is_key_press() {
+        if let crossterm::event::Event::Key(key) = crossterm::event::read()?
+            && key.kind == crossterm::event::KeyEventKind::Press
+            && app.handle_key(key)
+        {
+            // returns true -> quit
             break Ok(());
         }
     }

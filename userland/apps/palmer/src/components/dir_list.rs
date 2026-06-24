@@ -1,7 +1,6 @@
-use std::{
-    fs::read_dir,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
+
+use crate::path::PathBufExt;
 
 use ratatui::{
     Frame,
@@ -10,38 +9,27 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DirList {
     pub entries: Vec<String>,
     pub selected: ListState,
 }
 
 impl DirList {
-    pub fn new(path: &Path) -> Self {
-        let entries: Vec<String> = read_dir(path)
-            .map(|rd| {
-                rd.filter_map(|e| e.ok())
-                    .map(|e| e.file_name().to_string_lossy().into_owned())
-                    .collect()
-            })
-            .unwrap_or_default();
-
+    /* initalizer for cwd */
+    pub fn new(path: &PathBuf) -> Self {
+        let entries = path.get_all();
         let mut selected = ListState::default();
         selected.select(Some(0));
         Self { entries, selected }
     }
 
+    /* initializer for parent dir */
     pub fn with_highlight(path: PathBuf, name: Option<&str>) -> Self {
         if name.unwrap().is_empty() {
             println!("ok");
         }
-        let entries: Vec<String> = read_dir(&path)
-            .map(|rd| {
-                rd.filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
-                    .collect()
-            })
-            .unwrap_or_default();
-
+        let entries = path.get_all();
         let mut selected = ListState::default();
         let idx = name.and_then(|n| entries.iter().position(|e| e == n));
         selected.select(idx);
@@ -49,6 +37,7 @@ impl DirList {
         Self { entries, selected }
     }
 
+    /* initalizer only used as a fallback */
     pub fn empty() -> Self {
         Self {
             entries: Vec::default(),
@@ -68,5 +57,34 @@ impl DirList {
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
         frame.render_stateful_widget(list, area, &mut self.selected);
+    }
+
+    /* max cursor: 0 , min cursor: entries.len - 1 */
+    pub fn cursor_up(&mut self) {
+        let pos = self.selected.selected().unwrap_or(0);
+        if pos > 0 {
+            self.selected.select(Some(pos - 1));
+        }
+    }
+
+    pub fn cursor_down(&mut self) {
+        let pos = self.selected.selected().unwrap_or(0);
+        if pos + 1 < self.entries.len() {
+            self.selected.select(Some(pos + 1));
+        }
+    }
+
+    pub fn cursor_top(&mut self) {
+        self.selected.select_first();
+    }
+
+    pub fn cursor_bottom(&mut self) {
+        self.selected.select_last();
+    }
+
+    pub fn selected_entry(&mut self) -> Option<&str> {
+        self.selected
+            .selected()
+            .and_then(|pos| self.entries.get(pos).map(|s| s.as_str()))
     }
 }
