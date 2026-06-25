@@ -9,9 +9,11 @@ use ratatui::{
 
 use crate::components::{CmdLine, DirList, Preview, Statbar, cmdline::Mode};
 
+#[derive(Debug)]
 pub struct App {
     /* global state  */
     pub cwd: PathBuf,
+    pub show_hidden: bool,
     /* ui components */
     pub parent: DirList,
     pub current: DirList,
@@ -31,6 +33,7 @@ impl App {
             None => DirList::empty(),
         };
 
+        let show_hidden = false;
         let current = DirList::new(&cwd);
         let preview = Preview::from(&cwd, &current);
         let statbar = Statbar::new(&cwd);
@@ -38,6 +41,7 @@ impl App {
 
         Self {
             cwd,
+            show_hidden,
             parent,
             current,
             preview,
@@ -65,9 +69,9 @@ impl App {
             .split(main_area);
 
         self.statbar.render(frame, statbar_area);
-        self.parent.render(frame, columns[0]);
-        self.current.render(frame, columns[1]);
-        self.preview.render(frame, columns[2]);
+        self.parent.render(frame, columns[0], self.show_hidden);
+        self.current.render(frame, columns[1], self.show_hidden);
+        self.preview.render(frame, columns[2], self.show_hidden);
 
         if self.cmdline.is_open() {
             let area = self.cmdline.render_cmdline_area(60, 3, frame.area());
@@ -100,6 +104,8 @@ impl App {
             /* change dir */
             (_, KeyCode::Char('l')) | (_, KeyCode::Enter) => self.enter_selected(),
             (_, KeyCode::Char('h')) | (_, KeyCode::Backspace) => self.go_up(),
+
+            (_, KeyCode::Char('.')) => self.toggle_hidden(),
 
             /* cmdline keybinds */
             (_, KeyCode::Char('s')) => self.cmdline.open(Mode::Find),
@@ -162,8 +168,17 @@ impl App {
         }
     }
 
+    fn toggle_hidden(&mut self) {
+        self.show_hidden = !self.show_hidden;
+        self.refresh_all();
+    }
+
     fn refresh_preview(&mut self) {
         self.preview = Preview::from(&self.cwd, &self.current);
+    }
+
+    fn refresh_statbar(&mut self) {
+        self.statbar = Statbar::from(&self.cwd, &self.cmdline);
     }
 
     fn refresh_all(&mut self) {
@@ -181,10 +196,9 @@ impl App {
     }
 
     fn search(&mut self) {
-        self.current = DirList::from_search(self.cmdline.search());
+        self.current = DirList::from_search(self.cmdline.search(&self.cwd));
+        self.refresh_statbar();
         self.cmdline.close();
-
-        println!("{}", self.current.entries[0]);
         self.refresh_preview();
     }
 }

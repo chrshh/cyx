@@ -64,8 +64,10 @@ pub fn collect_dir(
     tp: &ThreadPool,
     out: &Arc<Mutex<Vec<SearchResult>>>,
 ) -> Result<(), CGrepError> {
-    for entry in read_dir(path).unwrap() {
-        let entry = entry.unwrap();
+    let Ok(entries) = read_dir(path) else {
+        return Ok(());
+    };
+    for entry in entries.flatten() {
         if skip_entry(&entry.path()) {
             continue;
         }

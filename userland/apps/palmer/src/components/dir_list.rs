@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::path::PathBufExt;
+use crate::path::{PathBufExt, StringPathExt};
 
 use ratatui::{
     Frame,
@@ -50,7 +50,7 @@ impl DirList {
         let mut selected = ListState::default();
         selected.select(Some(0));
         if results.is_empty() {
-            panic!("entries from search are empty")
+            return DirList::empty();
         }
         Self {
             entries: results,
@@ -58,10 +58,11 @@ impl DirList {
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, show_hidden: bool) {
         let items: Vec<ListItem> = self
             .entries
             .iter()
+            .filter(|s| !s.is_hidden() || show_hidden)
             .map(|e| {
                 // Check if it's a directory (simple check based on trailing slash,
                 // or adapt this to match your specific entry struct logic)

@@ -1,4 +1,4 @@
-use crate::path::PathExt;
+use crate::{components::CmdLine, path::PathExt};
 use std::path::Path;
 
 use ratatui::{
@@ -10,14 +10,24 @@ use ratatui::{
 
 #[derive(Debug, Default)]
 pub struct Statbar {
-    pub current_dir: String,
+    pub content: String,
 }
 
 impl Statbar {
     pub fn new(cwd: &Path) -> Self {
         Self {
-            current_dir: cwd.pretty(),
+            content: cwd.pretty(),
         }
+    }
+
+    pub fn from(cwd: &Path, cli: &CmdLine) -> Self {
+        if cli.mode.is_none() {
+            return Self {
+                content: cwd.pretty(),
+            };
+        }
+        let content = cwd.pretty() + " | " + cli.get_search_text() + ": " + cli.input.as_str();
+        Self { content }
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -31,7 +41,7 @@ impl Statbar {
             .split(inner);
 
         frame.render_widget(
-            Paragraph::new(self.current_dir.as_str())
+            Paragraph::new(self.content.as_str())
                 .style(Style::default().fg(Color::Cyan))
                 .left_aligned(),
             chunks[0],

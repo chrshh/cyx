@@ -28,11 +28,7 @@ pub fn run(raw_args: &[String]) -> Result<bool, CFindError> {
 }
 
 /* lib API entry point */
-pub fn find_in(
-    pattern: Option<&str>,
-    path: &str,
-    flags: u32,
-) -> Result<Vec<PathBuf>, CFindError> {
+pub fn find_in(pattern: Option<&str>, path: &str, flags: u32) -> Result<Vec<PathBuf>, CFindError> {
     let mut flags = flags;
     if pattern.is_none() {
         flags |= flags::ALL_FILES;

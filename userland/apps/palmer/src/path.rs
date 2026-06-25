@@ -13,6 +13,7 @@ pub trait PathBufExt {
 
 pub trait StringPathExt {
     fn pretty(&self, cwd: &Path) -> String;
+    fn is_hidden(&self) -> bool;
 }
 
 impl PathExt for Path {
@@ -51,5 +52,9 @@ impl StringPathExt for String {
             .strip_prefix("/")
             .unwrap()
             .to_string()
+    }
+
+    fn is_hidden(&self) -> bool {
+        self.starts_with(".")
     }
 }

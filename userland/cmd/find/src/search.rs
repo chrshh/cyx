@@ -57,8 +57,8 @@ pub fn collect_matches(cfg: Arc<Config>) -> Result<Vec<PathBuf>, CFindError> {
 }
 
 pub fn collect_dir(path: &str, cfg: &Arc<Config>, tp: &ThreadPool, out: &Arc<Mutex<Vec<PathBuf>>>) {
-    for entry in read_dir(path).unwrap() {
-        let entry = entry.unwrap();
+    let Ok(entries) = read_dir(path) else { return };
+    for entry in entries.flatten() {
         let p = entry.path();
 
         if skip_entry(&p) {
@@ -91,7 +91,11 @@ pub fn search(cfg: Arc<Config>, start: Instant) -> Result<bool, CFindError> {
     let mut w = Output::default();
 
     for p in results {
-        Output::push_match(&mut w, SearchResult::new(p.to_string_lossy().into_owned()), &cfg);
+        Output::push_match(
+            &mut w,
+            SearchResult::new(p.to_string_lossy().into_owned()),
+            &cfg,
+        );
     }
 
     let _ = start.elapsed();

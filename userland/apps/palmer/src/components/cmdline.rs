@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, path::Path};
 
 use ratatui::{
     Frame,
@@ -88,16 +88,15 @@ impl CmdLine {
     }
 
     /* entry point for cmdline search */
-    pub fn search(&mut self) -> Vec<String> {
+    pub fn search(&mut self, cwd: &Path) -> Vec<String> {
         match self.mode {
-            Some(Mode::Grep) => self.search_from_grep(),
-            Some(Mode::Find) => self.search_from_find(),
+            Some(Mode::Grep) => self.search_from_grep(cwd),
+            Some(Mode::Find) => self.search_from_find(cwd),
             None => Vec::default(),
         }
     }
 
-    pub fn search_from_grep(&mut self) -> Vec<String> {
-        let cwd = std::env::current_dir().unwrap();
+    pub fn search_from_grep(&mut self, cwd: &Path) -> Vec<String> {
         let results = cg::search_in(self.input.as_str(), cwd.to_str().unwrap(), 0).unwrap();
 
         let mut seen: HashSet<String> = HashSet::new();
@@ -105,11 +104,22 @@ impl CmdLine {
         results
             .into_iter()
             .filter(|f| seen.insert(f.filepath.clone()))
-            .map(|f| f.filepath.pretty(&cwd))
+            .map(|f| f.filepath.pretty(cwd))
             .collect()
     }
 
-    pub fn search_from_find(&mut self) -> Vec<String> {
-        Vec::default()
+    pub fn search_from_find(&mut self, cwd: &Path) -> Vec<String> {
+        let results = cfd::find_in(Some(self.input.as_str()), cwd.to_str().unwrap(), 0).unwrap();
+
+        let mut seen: HashSet<String> = HashSet::new();
+
+        results
+            .into_iter()
+            .filter(|f| {
+                seen.insert(f.to_str().unwrap().to_string())
+                // && f.file_name().unwrap().to_str().unwrap().starts_with(".")
+            })
+            .map(|f| f.to_string_lossy().into_owned().pretty(cwd))
+            .collect()
     }
 }
