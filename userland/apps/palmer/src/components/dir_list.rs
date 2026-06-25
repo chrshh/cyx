@@ -46,6 +46,18 @@ impl DirList {
         }
     }
 
+    pub fn from_search(results: Vec<String>) -> Self {
+        let mut selected = ListState::default();
+        selected.select(Some(0));
+        if results.is_empty() {
+            panic!("entries from search are empty")
+        }
+        Self {
+            entries: results,
+            selected,
+        }
+    }
+
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {
         let items: Vec<ListItem> = self
             .entries

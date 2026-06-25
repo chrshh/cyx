@@ -11,6 +11,10 @@ pub trait PathBufExt {
     fn get_all(&self) -> Vec<String>;
 }
 
+pub trait StringPathExt {
+    fn pretty(&self, cwd: &Path) -> String;
+}
+
 impl PathExt for Path {
     fn pretty(&self) -> String {
         let prefix = "~/";
@@ -33,5 +37,19 @@ impl PathBufExt for PathBuf {
             .unwrap_or_default();
 
         entries
+    }
+}
+
+impl StringPathExt for String {
+    fn pretty(&self, cwd: &Path) -> String
+    where
+        Self: std::convert::AsRef<std::path::Path>,
+    {
+        /* strip_prefix 2x -> leading slash was getting added to path */
+        self.strip_prefix(cwd.to_string_lossy().as_ref())
+            .unwrap_or(self)
+            .strip_prefix("/")
+            .unwrap()
+            .to_string()
     }
 }

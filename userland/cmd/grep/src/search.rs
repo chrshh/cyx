@@ -11,6 +11,7 @@ use crate::{
     writer::Output,
 };
 
+#[derive(Debug, Default, Clone)]
 pub struct SearchResult {
     pub filepath: String,
     pub complement: String,

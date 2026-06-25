@@ -4,9 +4,10 @@ use ratatui::{
     Frame,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
     layout::{Constraint, Direction, Layout},
+    widgets::Clear,
 };
 
-use crate::components::{DirList, Preview, Statbar};
+use crate::components::{CmdLine, DirList, Preview, Statbar, cmdline::Mode};
 
 pub struct App {
     /* global state  */
@@ -16,6 +17,7 @@ pub struct App {
     pub current: DirList,
     pub preview: Preview,
     pub statbar: Statbar,
+    pub cmdline: CmdLine,
 }
 
 impl App {
@@ -32,6 +34,7 @@ impl App {
         let current = DirList::new(&cwd);
         let preview = Preview::from(&cwd, &current);
         let statbar = Statbar::new(&cwd);
+        let cmdline = CmdLine::init();
 
         Self {
             cwd,
@@ -39,6 +42,7 @@ impl App {
             current,
             preview,
             statbar,
+            cmdline,
         }
     }
 
@@ -64,13 +68,26 @@ impl App {
         self.parent.render(frame, columns[0]);
         self.current.render(frame, columns[1]);
         self.preview.render(frame, columns[2]);
+
+        if self.cmdline.is_open() {
+            let area = self.cmdline.render_cmdline_area(60, 3, frame.area());
+            frame.render_widget(Clear, area);
+            self.cmdline.render(frame, area);
+        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> bool {
+        /* intercept keystrokes if cmdline is open */
+        if self.cmdline.mode.is_some() {
+            return self.handle_cmdline_key(key);
+        }
         match (key.modifiers, key.code) {
             /* QUIT */
-            (_, KeyCode::Char('q')) | (_, KeyCode::Esc) => return true,
+            (_, KeyCode::Char('q')) => return true,
             (KeyModifiers::CONTROL, KeyCode::Char('c')) => return true,
+
+            /* refresh (to clear search results) */
+            (_, KeyCode::Esc) => self.refresh_all(),
 
             /* navigate cwd */
             (_, KeyCode::Char('j')) | (_, KeyCode::Down) => self.move_down(),
@@ -80,12 +97,32 @@ impl App {
             (_, KeyCode::Char('g')) | (_, KeyCode::Home) => self.jump_top(),
             (_, KeyCode::Char('G')) | (_, KeyCode::End) => self.jump_bottom(),
 
-            /* /* change dir */ */
-            (_, KeyCode::Char('h')) | (_, KeyCode::Enter) => self.enter_selected(),
-            (_, KeyCode::Char('l')) | (_, KeyCode::Backspace) => self.go_up(),
+            /* change dir */
+            (_, KeyCode::Char('l')) | (_, KeyCode::Enter) => self.enter_selected(),
+            (_, KeyCode::Char('h')) | (_, KeyCode::Backspace) => self.go_up(),
+
+            /* cmdline keybinds */
+            (_, KeyCode::Char('s')) => self.cmdline.open(Mode::Find),
+            (_, KeyCode::Char('S')) => self.cmdline.open(Mode::Grep),
 
             /* ignore all else */
             _ => {}
+        }
+        false
+    }
+
+    pub fn handle_cmdline_key(&mut self, key: KeyEvent) -> bool {
+        match (key.modifiers, key.code) {
+            /* QUIT */
+            (_, KeyCode::Char('q')) => return true,
+            (KeyModifiers::CONTROL, KeyCode::Char('c')) => return true,
+
+            (_, KeyCode::Esc) => self.cmdline.close(),
+            (_, KeyCode::Enter) => self.search(),
+
+            (_, KeyCode::Backspace) => self.cmdline.remove_char(),
+
+            _ => self.cmdline.add_char(key.code.as_char().unwrap()),
         }
         false
     }
@@ -141,5 +178,13 @@ impl App {
         self.current = DirList::new(&self.cwd);
         self.preview = Preview::from(&self.cwd, &self.current);
         self.statbar = Statbar::new(&self.cwd);
+    }
+
+    fn search(&mut self) {
+        self.current = DirList::from_search(self.cmdline.search());
+        self.cmdline.close();
+
+        println!("{}", self.current.entries[0]);
+        self.refresh_preview();
     }
 }
