@@ -1,6 +1,6 @@
 use std::{
     fs::{File, metadata, read_dir, read_to_string},
-    io::{self, BufWriter, Read, Write, stdout},
+    io::{self, BufWriter, Read, stdout},
     path::Path,
     sync::{Arc, Mutex, atomic::Ordering},
     time::Instant,
@@ -27,8 +27,8 @@ impl SearchResult {
     }
 }
 
-/* main entry point for searching */
-pub fn search(cfg: Arc<Config>, start: Instant) -> Result<bool, CGrepError> {
+/* Shared core used by BOTH the binary & lib API */
+pub fn collect_matches(cfg: Arc<Config>) -> Result<Vec<SearchResult>, CGrepError> {
     if !Path::new(&cfg.path).exists() {
         return Err(CGrepError::NotFound(cfg.path.clone()));
     }
@@ -38,34 +38,31 @@ pub fn search(cfg: Arc<Config>, start: Instant) -> Result<bool, CGrepError> {
         return Err(CGrepError::IsDir(cfg.path.clone()));
     }
 
-    let out = Arc::new(Mutex::new(BufWriter::new(stdout())));
+    let results = Arc::new(Mutex::new(Vec::new()));
 
-    let found = if meta.is_dir() {
+    if meta.is_dir() {
         let tp = ThreadPool::new()?;
-        search_dir(&cfg.path, &Arc::clone(&cfg), &tp, &out)?
+        collect_dir(&cfg.path, &cfg, &tp, &results)?;
+        drop(tp);
     } else {
-        let mut guard = out.lock().unwrap();
-        search_file(&cfg.path, &cfg, &mut *guard)?
-    };
+        let mut found = search_file(&cfg.path, &cfg)?;
+        results.lock().unwrap().append(&mut found);
+    }
 
-    /* print info that can only exist after execution of program is complete */
-    let end = start.elapsed();
-    let out_copy = Arc::clone(&out);
-    let mut guard = out_copy.lock().unwrap();
-    let mut w = Output::default();
-    Output::post_search_output(&mut w, &cfg, end);
-    Output::flush_to(&mut w, &mut *guard);
+    let results = Arc::into_inner(results)
+        .expect("all worker threads joined; sole Arc owner remains")
+        .into_inner()
+        .unwrap();
 
-    Ok(found)
+    Ok(results)
 }
 
-/* iterates through entries and calls search_file when a file is found */
-pub fn search_dir<W: Write + Send + 'static>(
+pub fn collect_dir(
     path: &str,
     cfg: &Arc<Config>,
     tp: &ThreadPool,
-    out: &Arc<Mutex<W>>,
-) -> Result<bool, CGrepError> {
+    out: &Arc<Mutex<Vec<SearchResult>>>,
+) -> Result<(), CGrepError> {
     for entry in read_dir(path).unwrap() {
         let entry = entry.unwrap();
         if skip_entry(&entry.path()) {
@@ -76,43 +73,60 @@ pub fn search_dir<W: Write + Send + 'static>(
             let out_clone = Arc::clone(out);
             let cfg = Arc::clone(cfg);
             tp.execute(move || {
-                let mut guard = out_clone.lock().unwrap();
-                search_file(entry.to_str().unwrap(), &cfg, &mut *guard).unwrap();
+                if let Ok(mut found) = search_file(entry.to_str().unwrap(), &cfg) {
+                    out_clone.lock().unwrap().append(&mut found);
+                }
             });
         } else {
-            search_dir(entry.path().to_str().unwrap(), cfg, tp, out).unwrap();
+            collect_dir(entry.path().to_str().unwrap(), cfg, tp, out)?;
         }
     }
-    Ok(true)
+    Ok(())
 }
 
-pub fn search_file<W: Write>(path: &str, cfg: &Config, out: &mut W) -> Result<bool, CGrepError> {
-    /* skips binary files and returns false */
-    let mut found = false;
+pub fn search_file(path: &str, cfg: &Config) -> Result<Vec<SearchResult>, CGrepError> {
+    let mut results = Vec::new();
+
     if is_binary_heuristic(path)? {
-        return Ok(found);
+        return Ok(results);
     }
 
-    let mut w = Output::default();
-
-    /* skips invalid files */
     let contents = match read_to_string(path) {
         Ok(c) => c,
-        Err(_) => return Ok(found),
+        Err(_) => return Ok(results),
     };
 
     for (i, line) in contents.lines().enumerate() {
         if matches(line, Config::as_ref(cfg)) {
             set_success_exit_code();
-            Output::push_match(
-                &mut w,
-                SearchResult::new(String::from(path), String::from(line), i + 1),
-                cfg,
-            );
-            found = true;
+            results.push(SearchResult::new(
+                String::from(path),
+                String::from(line),
+                i + 1,
+            ));
         }
     }
-    w.flush_to(out);
+
+    Ok(results)
+}
+
+/* entry point for bin */
+pub fn search(cfg: Arc<Config>, start: Instant) -> Result<bool, CGrepError> {
+    let results = collect_matches(Arc::clone(&cfg))?;
+    let found = !results.is_empty();
+
+    let out = stdout();
+    let mut guard = BufWriter::new(out.lock());
+    let mut w = Output::default();
+
+    for r in results {
+        Output::push_match(&mut w, r, &cfg);
+    }
+
+    let end = start.elapsed();
+    Output::post_search_output(&mut w, &cfg, end);
+    Output::flush_to(&mut w, &mut guard);
+
     Ok(found)
 }
 

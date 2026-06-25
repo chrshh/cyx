@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+# All Rust command crates live under cmd/ alongside the C commands — the tree
+# is organised by function (a command is a command), not by language. Add a new
+# Rust command with:
+#   cd userland/cmd && cargo new --vcs none --bin <name>
+# then list it here. Each crate produces one binary named after the crate;
+# cmd/build-rust.py harvests every release executable and installs it into
+# build/cmd-rs/ for the disk image, next to the C commands from build/cmd/.
+members = ["cmd/find", "cmd/grep", "apps/palmer"]
+# The remaining GUI/TUI apps still build through their own per-app toolchain
+# images (different system deps). Excluding them keeps host-side `cargo` runs
+# inside an app dir from being absorbed into this workspace. palmer is a member
+# (above) because it depends on the command crates as libraries — it shares
+# this lockfile and target dir.
+exclude = ["apps/squishy", "apps/dinky", "apps/yoink"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.profiling]
+inherits = "release"
+strip = false
+debug = true

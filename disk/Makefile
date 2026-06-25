@@ -13,6 +13,7 @@ DISPLAY := ../build/display
 SQUISHY := ../build/squishy
 TEXTR   := ../build/textr
 DINKY   := ../build/dinky
+PALMER  := ../build/palmer
 CMDDIR  := ../build/cmd
 CMDRSDIR := ../build/cmd-rs
 IMAGE   := ../build/disk.img
@@ -31,7 +32,7 @@ init: cinit.c
 
 # Layered staging: Debian userland goes down first as the base, then our own
 # binaries and config files overlay on top. 
-rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display $(ROOTFS)/bin/squishy $(ROOTFS)/bin/textr $(ROOTFS)/bin/dinky stage-cmd stage-cmd-rs $(ROOTFS)/etc/passwd
+rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display $(ROOTFS)/bin/squishy $(ROOTFS)/bin/textr $(ROOTFS)/bin/dinky $(ROOTFS)/bin/palmer stage-cmd stage-cmd-rs $(ROOTFS)/etc/passwd
 	mkdir -p $(ROOTFS)/dev $(ROOTFS)/proc $(ROOTFS)/sys $(ROOTFS)/tmp $(ROOTFS)/root $(ROOTFS)/home $(ROOTFS)/run
 
 # The marker file ensures we only extract and purge once. 
@@ -79,6 +80,9 @@ $(ROOTFS)/bin/textr: $(TEXTR) $(ROOTFS)/.staged
 
 $(ROOTFS)/bin/dinky: $(DINKY) $(ROOTFS)/.staged
 	install -D -m 755 $(DINKY) $(ROOTFS)/bin/dinky
+
+$(ROOTFS)/bin/palmer: $(PALMER) $(ROOTFS)/.staged
+	install -D -m 755 $(PALMER) $(ROOTFS)/bin/palmer
 
 $(ROOTFS)/etc/passwd: etc/passwd etc/group etc/hostname $(ROOTFS)/.staged
 	mkdir -p $(ROOTFS)/etc

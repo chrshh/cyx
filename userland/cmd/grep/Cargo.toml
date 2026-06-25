@@ -1,0 +1,6 @@
+[package]
+name = "cg"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

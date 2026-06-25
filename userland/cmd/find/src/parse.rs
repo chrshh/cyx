@@ -33,13 +33,13 @@ pub fn parse_args(raw_args: &[String]) -> Result<Config, CFindError> {
     let positional = parse_flags(&mut cfg, raw_args)?;
 
     /* If a flag (-e) already consumed the pattern, the next positional
-       is the optional root path. Otherwise the first positional is the
-       pattern and the second is the optional root path. */
+    is the optional root path. Otherwise the first positional is the
+    pattern and the second is the optional root path. */
     let mut iter = positional.into_iter();
-    if cfg.pattern.is_none() {
-        if let Some(p) = iter.next() {
-            cfg.pattern = Some(p);
-        }
+    if cfg.pattern.is_none()
+        && let Some(p) = iter.next()
+    {
+        cfg.pattern = Some(p);
     }
     if let Some(rp) = iter.next() {
         cfg.root_path = Some(rp);

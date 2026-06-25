@@ -1,0 +1,4 @@
+# The C builder image (userland/Dockerfile) COPYs cmd/ wholesale, which now
+# contains Rust command crates. Keep their (potentially multi-hundred-MB)
+# host-built target/ dirs out of the build context.
+**/target

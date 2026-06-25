@@ -35,15 +35,18 @@ pub fn parse_args(raw_args: &[String]) -> Result<Config, CGrepError> {
                 return Err(CGrepError::PatternMissing);
             }
 
-            if let Some(h) = raw_args.get(FlagConfig::NoFlags.query_idx())
-                && h.is_empty()
-            {
-                return Err(CGrepError::PathMissing);
-            }
+            /* if no path is provided, cwd is used by default */
+            let path = match raw_args.get(FlagConfig::NoFlags.path_idx()) {
+                Some(h) if !h.is_empty() => h.clone(),
+                _ => std::env::current_dir()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned(),
+            };
 
             Ok(Config {
                 pattern: raw_args[FlagConfig::NoFlags.query_idx()].clone(),
-                path: raw_args[FlagConfig::NoFlags.path_idx()].clone(),
+                path,
                 flags,
             })
         }
@@ -53,15 +56,19 @@ pub fn parse_args(raw_args: &[String]) -> Result<Config, CGrepError> {
             {
                 return Err(CGrepError::PatternMissing);
             }
-            if let Some(h) = raw_args.get(FlagConfig::Flags.path_idx())
-                && h.is_empty()
-            {
-                return Err(CGrepError::PathMissing);
-            }
+
+            /* if no path is provided, cwd is used by default */
+            let path = match raw_args.get(FlagConfig::Flags.path_idx()) {
+                Some(h) if !h.is_empty() => h.clone(),
+                _ => std::env::current_dir()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned(),
+            };
 
             Ok(Config {
                 pattern: raw_args[FlagConfig::Flags.query_idx()].clone(),
-                path: raw_args[FlagConfig::Flags.path_idx()].clone(),
+                path,
                 flags,
             })
         }

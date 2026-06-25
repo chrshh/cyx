@@ -1,0 +1,3 @@
+# Cargo workspace build output (host cargo runs land here; the docker build
+# uses build/cmd-rs-target via CARGO_TARGET_DIR).
+/target

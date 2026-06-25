@@ -1,5 +1,5 @@
-# Toolchain image for building the cmd-rs workspace (Rust coreutil-style
-# commands). Uses rust:1-bookworm so each binary links against Debian
+# Toolchain image for building the Rust command crates (the workspace members
+# under cmd/). Uses rust:1-bookworm so each binary links against Debian
 # bookworm's glibc (2.36) — the same glibc baked into our guest's Debian
 # userland. Building on the Arch host would link against glibc 2.43 and
 # fail to run inside the guest. Commands here are expected to be pure Rust

@@ -1,8 +1,8 @@
 use std::{
     fs::{metadata, read_dir},
-    io::{BufWriter, Write, stdout},
+    io::{BufWriter, stdout},
     os::unix::fs::PermissionsExt,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex, atomic::Ordering},
     time::Instant,
 };
@@ -27,8 +27,8 @@ impl SearchResult {
     }
 }
 
-/* main entry point for searching */
-pub fn search(cfg: Arc<Config>, start: Instant) -> Result<bool, CFindError> {
+/* shared core used by both the binary & lib API */
+pub fn collect_matches(cfg: Arc<Config>) -> Result<Vec<PathBuf>, CFindError> {
     let root = cfg.root_path.as_deref().unwrap_or(".").to_string();
 
     if !Path::new(&root).exists() {
@@ -40,34 +40,23 @@ pub fn search(cfg: Arc<Config>, start: Instant) -> Result<bool, CFindError> {
         return Err(CFindError::IsFile(root));
     }
 
-    let out = Arc::new(Mutex::new(BufWriter::new(stdout())));
+    let results = Arc::new(Mutex::new(Vec::new()));
 
-    /* scope the pool so all queued jobs finish before post-search output */
+    /* scope the pool so all queued jobs finish before we unwrap the vec */
     {
         let tp = ThreadPool::new()?;
-        search_dir(&root, &Arc::clone(&cfg), &tp, &out);
+        collect_dir(&root, &cfg, &tp, &results);
     }
 
-    let _ = start.elapsed();
+    let results = Arc::into_inner(results)
+        .expect("all worker threads joined; sole Arc owner remains")
+        .into_inner()
+        .unwrap();
 
-    let out_copy = Arc::clone(&out);
-    let mut guard = out_copy.lock().unwrap();
-    let mut w = Output::default();
-    Output::post_search_output(&mut w);
-    w.flush_to(&mut *guard);
-
-    Ok(MATCH_FOUND.load(Ordering::Relaxed))
+    Ok(results)
 }
 
-/* walks directories synchronously; dispatches the per-entry match check
-   to the thread pool so the directory traversal isn't blocked by output
-   locking */
-pub fn search_dir<W: Write + Send + 'static>(
-    path: &str,
-    cfg: &Arc<Config>,
-    tp: &ThreadPool,
-    out: &Arc<Mutex<W>>,
-) {
+pub fn collect_dir(path: &str, cfg: &Arc<Config>, tp: &ThreadPool, out: &Arc<Mutex<Vec<PathBuf>>>) {
     for entry in read_dir(path).unwrap() {
         let entry = entry.unwrap();
         let p = entry.path();
@@ -82,21 +71,34 @@ pub fn search_dir<W: Write + Send + 'static>(
         tp.execute(move || {
             if check_match(&p_clone, &cfg_clone) {
                 set_success_exit_code();
-                let mut w = Output::default();
-                Output::push_match(
-                    &mut w,
-                    SearchResult::new(p_clone.to_string_lossy().to_string()),
-                    &cfg_clone,
-                );
-                let mut guard = out_clone.lock().unwrap();
-                w.flush_to(&mut *guard);
+                out_clone.lock().unwrap().push(p_clone);
             }
         });
 
         if p.is_dir() {
-            search_dir(p.to_str().unwrap_or(""), cfg, tp, out);
+            collect_dir(p.to_str().unwrap_or(""), cfg, tp, out);
         }
     }
+}
+
+/* entry point for bin */
+pub fn search(cfg: Arc<Config>, start: Instant) -> Result<bool, CFindError> {
+    let results = collect_matches(Arc::clone(&cfg))?;
+    let found = !results.is_empty();
+
+    let out = stdout();
+    let mut guard = BufWriter::new(out.lock());
+    let mut w = Output::default();
+
+    for p in results {
+        Output::push_match(&mut w, SearchResult::new(p.to_string_lossy().into_owned()), &cfg);
+    }
+
+    let _ = start.elapsed();
+    Output::post_search_output(&mut w);
+    w.flush_to(&mut guard);
+
+    Ok(found)
 }
 
 pub fn check_match(path: &Path, cfg: &Config) -> bool {

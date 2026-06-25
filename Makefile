@@ -1,4 +1,4 @@
-.PHONY: all clean clean-data clean-all init cjsh display cmd cmd-rs squishy textr dinky build-image image run run-shell-only run-graphical run-graphical-shell-only run-g run-gs
+.PHONY: all clean clean-data clean-all init cjsh display cmd cmd-rs squishy textr dinky palmer build-image image run run-shell-only run-graphical run-graphical-shell-only run-g run-gs
 ROOT      := $(CURDIR)
 BUILD     := $(ROOT)/build
 USERLAND  := $(ROOT)/userland
@@ -6,7 +6,9 @@ DISK      := $(ROOT)/disk
 DOCKER_IMAGE := cjyx-static
 SQUISHY_SRC := $(USERLAND)/apps/squishy
 DINKY_SRC   := $(USERLAND)/apps/dinky
-CMDRS_SRC   := $(USERLAND)/cmd-rs
+PALMER_SRC  := $(USERLAND)/apps/palmer
+CMDRS_SRC   := $(USERLAND)/cmd
+WORKSPACE   := $(USERLAND)/Cargo.toml
 # Our own kernel — built from kernel/src with virtio_gpu, bochs, ext4, etc all
 # compiled in (no module loading infrastructure in this OS).
 KERNEL := $(ROOT)/kernel/src/arch/x86/boot/bzImage
@@ -50,6 +52,7 @@ display: $(BUILD)/display
 squishy: $(BUILD)/squishy
 textr: $(BUILD)/textr
 dinky: $(BUILD)/dinky
+palmer: $(BUILD)/palmer
 
 build-image:
 	docker build \
@@ -84,6 +87,12 @@ $(BUILD)/squishy: $(SQUISHY_SRC)/build.py $(SQUISHY_SRC)/Dockerfile.build $(SQUI
 $(BUILD)/dinky: $(DINKY_SRC)/build.py $(DINKY_SRC)/Dockerfile.build $(DINKY_SRC)/Cargo.toml $(DINKY_SRC)/Cargo.lock $(wildcard $(DINKY_SRC)/src/*.rs) | $(BUILD)
 	python3 $(DINKY_SRC)/build.py $(BUILD)/dinky
 
+# palmer is a workspace member that links the cfd/cg command crates as
+# libraries, so its build.py builds from the workspace root (not apps/palmer)
+# and depends on those crates' sources too — touching cfd/cg rebuilds palmer.
+$(BUILD)/palmer: $(PALMER_SRC)/build.py $(PALMER_SRC)/Dockerfile.build $(PALMER_SRC)/Cargo.toml $(WORKSPACE) $(USERLAND)/Cargo.lock $(wildcard $(PALMER_SRC)/src/*.rs) $(wildcard $(PALMER_SRC)/src/components/*.rs) $(wildcard $(CMDRS_SRC)/*/Cargo.toml) $(wildcard $(CMDRS_SRC)/*/src/*.rs) | $(BUILD)
+	python3 $(PALMER_SRC)/build.py $(BUILD)/palmer
+
 # Full Debian userland: docker export gives us a tarball of the entire image
 # filesystem, which includes Mesa drivers, GTK/Qt libs, foot terminal,
 # Xwayland, dbus-daemon, seatd, etc. — everything a real userland needs.
@@ -113,12 +122,12 @@ cmd: build-image | $(BUILD)
 # squishy/dinky but produces N binaries (one per workspace member crate)
 # into build/cmd-rs/. The disk Makefile's stage-cmd-rs target installs each
 # one into rootfs/bin alongside the C commands from build/cmd/.
-cmd-rs: $(CMDRS_SRC)/build.py $(CMDRS_SRC)/Dockerfile.build $(CMDRS_SRC)/Cargo.toml $(wildcard $(CMDRS_SRC)/*/Cargo.toml) $(wildcard $(CMDRS_SRC)/*/src/*.rs) | $(BUILD)
+cmd-rs: $(CMDRS_SRC)/build-rust.py $(CMDRS_SRC)/Dockerfile.rust $(WORKSPACE) $(wildcard $(CMDRS_SRC)/*/Cargo.toml) $(wildcard $(CMDRS_SRC)/*/src/*.rs) | $(BUILD)
 	rm -rf $(BUILD)/cmd-rs
 	mkdir -p $(BUILD)/cmd-rs
-	python3 $(CMDRS_SRC)/build.py $(BUILD)/cmd-rs
+	python3 $(CMDRS_SRC)/build-rust.py $(BUILD)/cmd-rs
 
-image: $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky cmd cmd-rs $(BUILD)/.debian_rootfs $(DATA)
+image: $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky $(BUILD)/palmer cmd cmd-rs $(BUILD)/.debian_rootfs $(DATA)
 	$(MAKE) -C $(DISK) image
 
 run: image
@@ -136,7 +145,7 @@ run-gs: run-graphical-shell-only
 clean:
 	$(MAKE) -C $(USERLAND) clean
 	$(MAKE) -C $(DISK) clean
-	rm -rf $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky $(BUILD)/cmd $(BUILD)/cmd-rs $(BUILD)/cmd-rs-target $(BUILD)/disk.img
+	rm -rf $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky $(BUILD)/palmer $(BUILD)/palmer-target $(BUILD)/cmd $(BUILD)/cmd-rs $(BUILD)/cmd-rs-target $(BUILD)/disk.img
 
 clean-data:
 	rm -f $(DATA)

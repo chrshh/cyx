@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 ratatui = "0.30.2"
+cfd = { path = "../../cmd/find" }
+cg = { path = "../../cmd/grep" }

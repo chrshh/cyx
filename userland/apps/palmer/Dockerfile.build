@@ -1,0 +1,10 @@
+# Toolchain image for building palmer (Rust file-explorer TUI).
+#
+# Uses rust:1-bookworm so the produced binary links against Debian bookworm's
+# glibc (2.36) — the same glibc baked into our guest's Debian userland.
+# Building on the Arch host would link against glibc 2.43 and fail to run
+# inside the guest. palmer and its cfd/cg deps are pure Rust (ratatui +
+# crossterm), so nothing beyond the rust image needs apt-installing.
+FROM rust:1-bookworm
+
+WORKDIR /work
