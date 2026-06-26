@@ -1,5 +1,5 @@
-#ifndef TEXTR_H
-#define TEXTR_H
+#ifndef ASEMICS_H
+#define ASEMICS_H
 
 #include <stddef.h>
 #include <termios.h>
@@ -25,22 +25,27 @@
 
 #define TAB_STOP 8
 
+#define STATUS_BAR_RESERVE 2
+#define LINE_NUM_RESERVE   8
+
 /* commands */
 #define SAVE  (1 << 0)
 #define QUIT  (1 << 1)
 #define FORCE (1 << 2)
 
 /* colors */
-#define BLUE      "\x1b[94m"
-#define GREEN     "\x1b[38;2;165;214;255m"
-#define KEYWORD1  "\x1b[31m"
-#define KEYWORD2  "\x1b[31m"
-#define DEF_COLOR "\x1b[39m"
-#define COMMENT   "\x1b[90m"
-#define MLCOMMENT "\x1b[90m"
-#define MATCH     "\x1b[35m"
-#define OPERATOR  BLUE
-#define RESET     "\x1b[0m"
+#define DARK_GRAY  "\x1b[90m"
+#define BLUE       "\x1b[94m"
+#define GREEN      "\x1b[38;2;165;214;255m"
+#define KEYWORD1   "\x1b[31m"
+#define KEYWORD2   "\x1b[31m"
+#define DEF_COLOR  "\x1b[39m"
+#define COMMENT    "\x1b[90m"
+#define MLCOMMENT  "\x1b[90m"
+#define MATCH      "\x1b[35m"
+#define OPERATOR   BLUE
+#define FULL_RESET "\x1b[0m"
+#define RESET_FG   "\x1b[39m"
 
 /* global state */
 typedef enum { MODE_NORMAL, MODE_INSERT, MODE_COMMAND, MODE_VISUAL } EditorMode;
@@ -69,13 +74,13 @@ typedef struct {
 } EditorSyntax;
 
 typedef struct Row {
-    int            idx;             /* this row's position in the buffer */
-    int            size;            /* length of `chars` (raw line bytes) */
-    int            rsize;           /* length of `render` (after tab expansion) */
-    char          *chars;           /* raw line text as stored in the file */
-    char          *render;          /* line as drawn on screen (tabs expanded etc.) */
-    unsigned char *hl;              /* per-cell highlight codes, same length as `render` */
-    int            hl_open_comment; /* true if this row ends inside an unclosed multi-line comment */
+    int            idx;    /* this row's position in the buffer */
+    int            size;   /* length of `chars` (raw line bytes) */
+    int            rsize;  /* length of `render` (after tab expansion) */
+    char          *chars;  /* raw line text as stored in the file */
+    char          *render; /* line as drawn on screen (tabs expanded etc.) */
+    unsigned char *hl;     /* per-cell highlight codes, same length as `render` */
+    int hl_open_comment;   /* true if this row ends inside an unclosed multi-line comment */
 } Row;
 
 typedef struct {
@@ -145,22 +150,22 @@ void handleNormalModeKey(int c);
 void handleLeaderKey(void);
 
 /* editor.c */
-void  refreshScreen(void);
-void  clearScreen(void);
-void  drawRows(WriteBuf *wb);
-void  initEditor(Editor *e);
-WriteBuf  writeBufInit(void);
-void  writeBufFree(WriteBuf *wb);
-void  writeBufAppend(WriteBuf *wb, const char *s, int len);
-void  moveCursor(int key);
-void  editorOpen(char *filename);
-void  editorScroll(void);
-void  updateCursorShape(WriteBuf *wb);
-void  editorQuit(bool force);
-void  editorSave(void);
-int   editorCreateFile(char *filename);
-char *editorPrompt(char *prompt, void (*callback)(char *, int));
-void  welcomeScreen(WriteBuf *wb);
+void     refreshScreen(void);
+void     clearScreen(void);
+void     drawRows(WriteBuf *wb);
+void     initEditor(Editor *e);
+WriteBuf writeBufInit(void);
+void     writeBufFree(WriteBuf *wb);
+void     writeBufAppend(WriteBuf *wb, const char *s, int len);
+void     moveCursor(int key);
+void     editorOpen(char *filename);
+void     editorScroll(void);
+void     updateCursorShape(WriteBuf *wb);
+void     editorQuit(bool force);
+void     editorSave(void);
+int      editorCreateFile(char *filename);
+char    *editorPrompt(char *prompt, void (*callback)(char *, int));
+void     welcomeScreen(WriteBuf *wb);
 
 /* rows.c */
 void  editorInsertRow(int pos, char *s, size_t len);

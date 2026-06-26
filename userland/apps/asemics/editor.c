@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "textr.h"
+#include "asemics.h"
 
 void initEditor(Editor *e) {
     e->mode             = MODE_NORMAL;
@@ -23,7 +23,8 @@ void initEditor(Editor *e) {
     e->ui.cmdline[0]    = '\0';
     e->syntax           = NULL;
     if (getWindowSize(&e->viewport.height, &e->viewport.width) == -1) die("getWindowSize");
-    e->viewport.height -= 2; // these rows are reserved for the status bar(s) at the bottom
+    e->viewport.height -= STATUS_BAR_RESERVE; // status bar space for bottom of screen
+    e->viewport.width -= LINE_NUM_RESERVE;
 }
 
 void repositionCursorTL(WriteBuf *wb) {
@@ -33,8 +34,11 @@ void repositionCursorTL(WriteBuf *wb) {
 /* draw fn for entire editor */
 void drawRows(WriteBuf *wb) {
     int y;
-    for (y = 0; y < E.viewport.height - 1; y++) {
-        int filerow = y + E.viewport.row_off;
+    for (y = 0; y < E.viewport.height; y++) {
+        int  filerow = y + E.viewport.row_off;
+        char gutter[24];
+        int  glen;
+
         if (filerow >= E.buffer.num_rows) {
             if (E.buffer.num_rows == 0 && y == E.viewport.height / 3) {
                 /* welcome screen rendered when no file is selected */
@@ -43,6 +47,8 @@ void drawRows(WriteBuf *wb) {
                 writeBufAppend(wb, "~", 1);
             }
         } else {
+            glen = snprintf(gutter, sizeof(gutter), "%s%5d  %s", DARK_GRAY, filerow + 1, RESET_FG);
+            writeBufAppend(wb, gutter, glen);
             int len = E.buffer.rows[filerow].rsize - E.viewport.col_off;
             if (len < 0) len = 0;
             if (len > E.viewport.width) len = E.viewport.width;
@@ -144,10 +150,12 @@ void refreshScreen(void) {
     char buf[32];
     int  n;
 
+    /* status bar buffer */
     n = snprintf(buf, sizeof(buf), "\x1b[%d;1H", E.viewport.height + 1);
     writeBufAppend(&wb, buf, n);
     editorDrawStatusBar(&wb);
 
+    /* message bar buffer */
     n = snprintf(buf, sizeof(buf), "\x1b[%d;1H", E.viewport.height + 2);
     writeBufAppend(&wb, buf, n);
     if (E.ui.cmdline[0] != '\0') {
@@ -156,8 +164,9 @@ void refreshScreen(void) {
         editorDrawMsgBar(&wb);
     }
 
+    /* line number gutter buffer */
     n = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cursor.y - E.viewport.row_off) + 1,
-                 (E.cursor.rx - E.viewport.col_off) + 1);
+                 (E.cursor.rx - E.viewport.col_off) + LINE_NUM_RESERVE); // consumes 8 visual cols
     writeBufAppend(&wb, buf, n);
 
     /* Enabled cursor and render cursor based on EDITOR MODE */
@@ -174,8 +183,8 @@ void clearScreen(void) {
 
 WriteBuf writeBufInit() {
     WriteBuf wb;
-    wb.data   = NULL;
-    wb.len = 0;
+    wb.data = NULL;
+    wb.len  = 0;
     return wb;
 }
 
@@ -202,7 +211,7 @@ void moveCursor(int key) {
 
     case 'j':
     case ARROW_DOWN:
-        if (E.cursor.y < E.buffer.num_rows) { E.cursor.y++; }
+        if (E.cursor.y < E.buffer.num_rows - 1) { E.cursor.y++; }
         break;
 
     case 'k':
@@ -261,12 +270,18 @@ void editorOpen(char *filename) {
 
 void editorScroll() {
     E.cursor.rx = 0;
-    if (E.cursor.y < E.buffer.num_rows) { E.cursor.rx = editorRowXtoRx(&E.buffer.rows[E.cursor.y], E.cursor.x); }
+    if (E.cursor.y < E.buffer.num_rows) {
+        E.cursor.rx = editorRowXtoRx(&E.buffer.rows[E.cursor.y], E.cursor.x);
+    }
 
     if (E.cursor.y < E.viewport.row_off) { E.viewport.row_off = E.cursor.y; }
-    if (E.cursor.y >= E.viewport.row_off + E.viewport.height) { E.viewport.row_off = E.cursor.y - E.viewport.height + 1; }
+    if (E.cursor.y >= E.viewport.row_off + E.viewport.height) {
+        E.viewport.row_off = E.cursor.y - E.viewport.height + 1;
+    }
     if (E.cursor.rx < E.viewport.col_off) { E.viewport.col_off = E.cursor.rx; }
-    if (E.cursor.rx >= E.viewport.col_off + E.viewport.width) { E.viewport.col_off = E.cursor.rx - E.viewport.width + 1; }
+    if (E.cursor.rx >= E.viewport.col_off + E.viewport.width) {
+        E.viewport.col_off = E.cursor.rx - E.viewport.width + 1;
+    }
 }
 
 char *editorRowsToStr(int *buflen) {
@@ -302,8 +317,8 @@ void editorSave() {
             if (write(fd, buf, len) == len) {
                 close(fd);
                 free(buf);
-                E.buffer.dirty   = false;
-                E.ui.cmdline[0]  = '\0';
+                E.buffer.dirty  = false;
+                E.ui.cmdline[0] = '\0';
                 editorSetStatusMsg("%d: bytes written to disk", len);
                 editorSetSyntaxHighlight();
                 return;
@@ -323,9 +338,10 @@ void editorQuit(bool force) {
     } else {
         if (E.buffer.dirty) {
             char buf[80];
-            int  n = snprintf(buf, sizeof(buf),
-                              "%s has unsaved changes. '!q' to quit without saving", E.buffer.filename);
-            int  i = 0;
+            int  n =
+                snprintf(buf, sizeof(buf), "%s has unsaved changes. '!q' to quit without saving",
+                         E.buffer.filename);
+            int i           = 0;
             E.ui.cmdline[0] = '\0';
             while (buf[i] != '\0') {
                 commandInsertChar(buf[i]);

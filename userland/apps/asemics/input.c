@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-#include "textr.h"
+#include "asemics.h"
 
 int readKey(void) {
     int  nread;
@@ -66,24 +66,24 @@ void handleNormalModeKey(int c) {
     case '/': editorFind(); break;
 
     case 'o': {
-        Pos target  = actionInsertLineBelowCursor();
-        E.cursor.x  = target.x;
-        E.cursor.y  = target.y;
-        E.mode      = MODE_INSERT;
+        Pos target = actionInsertLineBelowCursor();
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
+        E.mode     = MODE_INSERT;
         break;
     }
 
     case 'O': {
-        Pos target  = actionInsertLineAboveCursor();
-        E.cursor.x  = target.x;
-        E.cursor.y  = target.y;
-        E.mode      = MODE_INSERT;
+        Pos target = actionInsertLineAboveCursor();
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
+        E.mode     = MODE_INSERT;
         break;
     }
 
     /* COMPLEX MOTIONS */
     case 'G': {
-        int scrl_down = E.buffer.num_rows;
+        int scrl_down = E.buffer.num_rows - 1;
         while (scrl_down--) {
             moveCursor('j');
         }

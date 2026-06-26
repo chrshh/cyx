@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "textr.h"
+#include "asemics.h"
 
 char *C_HL_extensions[] = { ".c", ".h", ".cpp", NULL };
 

@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include <termios.h>
 
-#include "textr.h"
+#include "asemics.h"
 
 Editor E;
 

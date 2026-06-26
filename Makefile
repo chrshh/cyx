@@ -1,4 +1,4 @@
-.PHONY: all clean clean-data clean-all init cjsh display cmd cmd-rs squishy textr dinky palmer build-image image run run-shell-only run-graphical run-graphical-shell-only run-g run-gs
+.PHONY: all clean clean-data clean-all init cjsh display cmd cmd-rs squishy asemics dinky palmer build-image image run run-shell-only run-graphical run-graphical-shell-only run-g run-gs
 ROOT      := $(CURDIR)
 BUILD     := $(ROOT)/build
 USERLAND  := $(ROOT)/userland
@@ -50,7 +50,7 @@ $(BUILD)/init: $(DISK)/cinit.c | $(BUILD)
 cjsh: $(BUILD)/cjsh
 display: $(BUILD)/display
 squishy: $(BUILD)/squishy
-textr: $(BUILD)/textr
+asemics: $(BUILD)/asemics
 dinky: $(BUILD)/dinky
 palmer: $(BUILD)/palmer
 
@@ -71,9 +71,9 @@ $(BUILD)/display: build-image | $(BUILD)
 	  docker cp $$cid:/cjyx/display/display $(BUILD)/display; \
 	  docker rm $$cid >/dev/null
 
-$(BUILD)/textr: build-image | $(BUILD)
+$(BUILD)/asemics: build-image | $(BUILD)
 	cid=$$(docker create $(DOCKER_IMAGE)); \
-	  docker cp $$cid:/cjyx/apps/textr/textr $(BUILD)/textr; \
+	  docker cp $$cid:/cjyx/apps/asemics/asemics $(BUILD)/asemics; \
 	  docker rm $$cid >/dev/null
 
 # Squishy is Rust, so it builds in its own toolchain image (rust:1-bookworm)
@@ -127,7 +127,7 @@ cmd-rs: $(CMDRS_SRC)/build-rust.py $(CMDRS_SRC)/Dockerfile.rust $(WORKSPACE) $(w
 	mkdir -p $(BUILD)/cmd-rs
 	python3 $(CMDRS_SRC)/build-rust.py $(BUILD)/cmd-rs
 
-image: $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky $(BUILD)/palmer cmd cmd-rs $(BUILD)/.debian_rootfs $(DATA)
+image: $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/asemics $(BUILD)/dinky $(BUILD)/palmer cmd cmd-rs $(BUILD)/.debian_rootfs $(DATA)
 	$(MAKE) -C $(DISK) image
 
 run: image
@@ -145,7 +145,7 @@ run-gs: run-graphical-shell-only
 clean:
 	$(MAKE) -C $(USERLAND) clean
 	$(MAKE) -C $(DISK) clean
-	rm -rf $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/textr $(BUILD)/dinky $(BUILD)/palmer $(BUILD)/palmer-target $(BUILD)/cmd $(BUILD)/cmd-rs $(BUILD)/cmd-rs-target $(BUILD)/disk.img
+	rm -rf $(BUILD)/init $(BUILD)/cjsh $(BUILD)/display $(BUILD)/squishy $(BUILD)/asemics $(BUILD)/dinky $(BUILD)/palmer $(BUILD)/palmer-target $(BUILD)/cmd $(BUILD)/cmd-rs $(BUILD)/cmd-rs-target $(BUILD)/disk.img
 
 clean-data:
 	rm -f $(DATA)

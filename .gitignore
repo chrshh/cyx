@@ -16,7 +16,7 @@ userland/cjsh/tests/test_ast
 # userland app binaries (built in-place by each app's Makefile).
 # Add new app binaries here as you create them, or build into a bin/ subdir
 # (already covered by the top-level `bin/` rule).
-userland/apps/textr/textr
+userland/apps/asemics/asemics
 userland/display/display
 
 # build artifacts

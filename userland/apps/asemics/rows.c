@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "textr.h"
+#include "asemics.h"
 
 void editorInsertRow(int pos, char *s, size_t len) {
     if (pos < 0 || pos > E.buffer.num_rows) return;

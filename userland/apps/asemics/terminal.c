@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
-#include "textr.h"
+#include "asemics.h"
 
 void die(const char *s) {
   clearScreen();

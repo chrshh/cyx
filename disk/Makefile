@@ -11,7 +11,7 @@ DEBIAN  := ../build/debian-rootfs
 CJSH    := ../build/cjsh
 DISPLAY := ../build/display
 SQUISHY := ../build/squishy
-TEXTR   := ../build/textr
+ASEMICS   := ../build/asemics
 DINKY   := ../build/dinky
 PALMER  := ../build/palmer
 CMDDIR  := ../build/cmd
@@ -32,7 +32,7 @@ init: cinit.c
 
 # Layered staging: Debian userland goes down first as the base, then our own
 # binaries and config files overlay on top. 
-rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display $(ROOTFS)/bin/squishy $(ROOTFS)/bin/textr $(ROOTFS)/bin/dinky $(ROOTFS)/bin/palmer stage-cmd stage-cmd-rs $(ROOTFS)/etc/passwd
+rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display $(ROOTFS)/bin/squishy $(ROOTFS)/bin/asemics $(ROOTFS)/bin/dinky $(ROOTFS)/bin/palmer stage-cmd stage-cmd-rs $(ROOTFS)/etc/passwd
 	mkdir -p $(ROOTFS)/dev $(ROOTFS)/proc $(ROOTFS)/sys $(ROOTFS)/tmp $(ROOTFS)/root $(ROOTFS)/home $(ROOTFS)/run
 
 # The marker file ensures we only extract and purge once. 
@@ -75,8 +75,9 @@ $(ROOTFS)/bin/display: $(DISPLAY) $(ROOTFS)/.staged
 $(ROOTFS)/bin/squishy: $(SQUISHY) $(ROOTFS)/.staged
 	install -D -m 755 $(SQUISHY) $(ROOTFS)/bin/squishy
 
-$(ROOTFS)/bin/textr: $(TEXTR) $(ROOTFS)/.staged
-	install -D -m 755 $(TEXTR) $(ROOTFS)/bin/textr
+$(ROOTFS)/bin/asemics: $(ASEMICS) $(ROOTFS)/.staged
+	install -D -m 755 $(ASEMICS) $(ROOTFS)/bin/asemics
+	ln -sf asemics $(ROOTFS)/bin/ase
 
 $(ROOTFS)/bin/dinky: $(DINKY) $(ROOTFS)/.staged
 	install -D -m 755 $(DINKY) $(ROOTFS)/bin/dinky

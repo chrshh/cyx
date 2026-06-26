@@ -114,10 +114,10 @@ COPY libcjyx/ libcjyx/
 COPY cjsh/ cjsh/
 COPY cmd/ cmd/
 COPY display/ display/
-# Only textr ships through the C image — squishy has its own Rust toolchain
+# Only asemics ships through the C image — squishy has its own Rust toolchain
 # image (see apps/squishy/Dockerfile.build) and copying apps/squishy here
 # would drag in its multi-hundred-MB target/ dir.
-COPY apps/textr/ apps/textr/
+COPY apps/asemics/ apps/asemics/
 COPY Makefile .
 
 RUN make clean && make $BUILD_TARGET EXTRA_FLAGS="$EXTRA_FLAGS"
