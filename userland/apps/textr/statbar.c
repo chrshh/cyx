@@ -4,7 +4,7 @@
 #include <string.h>
 
 char *getModeStr(void) {
-  switch (cfg.mode) {
+  switch (E.mode) {
   case MODE_INSERT:
     return "-- INSERT -- ";
     break;
@@ -23,8 +23,8 @@ char *getModeStr(void) {
   }
 }
 
-void editorDrawStatusBar(wBuf *wb) {
-  wBufAppend(wb, "\x1b[7m", 4);
+void editorDrawStatusBar(WriteBuf *wb) {
+  writeBufAppend(wb, "\x1b[7m", 4);
   char status[80], rstatus[80], mdstatus[20];
 
   int modelen = snprintf(
@@ -37,48 +37,48 @@ void editorDrawStatusBar(wBuf *wb) {
       status,
       sizeof(status),
       "%.20s - %d lines %s",
-      cfg.filename ? cfg.filename : "[No Name]",
-      cfg.numrows,
-      cfg.dirty ? "*" : "");
+      E.buffer.filename ? E.buffer.filename : "[No Name]",
+      E.buffer.num_rows,
+      E.buffer.dirty ? "*" : "");
 
   int rlen = snprintf(
       rstatus,
       sizeof(rstatus),
       "%s | %d/%d",
-      cfg.syntax ? cfg.syntax->filetype : "no ft",
-      cfg.y + 1,
-      cfg.numrows);
+      E.syntax ? E.syntax->filetype : "no ft",
+      E.cursor.y + 1,
+      E.buffer.num_rows);
 
-  if (modelen > cfg.cols) modelen = cfg.cols;
-  if (modelen + statuslen > cfg.cols) statuslen = cfg.cols - modelen;
-  if (modelen + statuslen + rlen > cfg.cols) rlen = cfg.cols - modelen - statuslen;
+  if (modelen > E.viewport.width) modelen = E.viewport.width;
+  if (modelen + statuslen > E.viewport.width) statuslen = E.viewport.width - modelen;
+  if (modelen + statuslen + rlen > E.viewport.width) rlen = E.viewport.width - modelen - statuslen;
   if (statuslen < 0) statuslen = 0;
   if (rlen < 0) rlen = 0;
 
-  wBufAppend(wb, mdstatus, modelen);
-  wBufAppend(wb, status, statuslen);
+  writeBufAppend(wb, mdstatus, modelen);
+  writeBufAppend(wb, status, statuslen);
 
   int written = modelen + statuslen;
-  while (written < cfg.cols - rlen) {
-    wBufAppend(wb, " ", 1);
+  while (written < E.viewport.width - rlen) {
+    writeBufAppend(wb, " ", 1);
     written++;
   }
-  wBufAppend(wb, rstatus, rlen);
-  wBufAppend(wb, "\x1b[m", 3);
+  writeBufAppend(wb, rstatus, rlen);
+  writeBufAppend(wb, "\x1b[m", 3);
 }
 
 void editorSetStatusMsg(const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  vsnprintf(cfg.statusmsg, sizeof(cfg.statusmsg), fmt, ap);
+  vsnprintf(E.ui.msg, sizeof(E.ui.msg), fmt, ap);
   va_end(ap);
-  cfg.statusmsg_time = time(NULL);
+  E.ui.msg_time = time(NULL);
 }
 
-void editorDrawMsgBar(wBuf *wb) {
-  wBufAppend(wb, "\x1b[K", 3);
-  int msglen = strlen(cfg.statusmsg);
-  if (msglen > cfg.cols) msglen = cfg.cols;
-  if (msglen && time(NULL) - cfg.statusmsg_time < 5)
-    wBufAppend(wb, cfg.statusmsg, msglen);
+void editorDrawMsgBar(WriteBuf *wb) {
+  writeBufAppend(wb, "\x1b[K", 3);
+  int msglen = strlen(E.ui.msg);
+  if (msglen > E.viewport.width) msglen = E.viewport.width;
+  if (msglen && time(NULL) - E.ui.msg_time < 5)
+    writeBufAppend(wb, E.ui.msg, msglen);
 }

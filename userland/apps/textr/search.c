@@ -11,7 +11,7 @@ void editorFindCallback(char *query, int key) {
     static char *saved_hl = NULL;
 
     if (saved_hl) {
-        memcpy(cfg.er[saved_hl_line].hl, saved_hl, cfg.er[saved_hl_line].rsize);
+        memcpy(E.buffer.rows[saved_hl_line].hl, saved_hl, E.buffer.rows[saved_hl_line].rsize);
         free(saved_hl);
         saved_hl = NULL;
     }
@@ -34,18 +34,18 @@ void editorFindCallback(char *query, int key) {
     int current = last_match;
 
     int i;
-    for (i = 0; i < cfg.numrows; i++) {
+    for (i = 0; i < E.buffer.num_rows; i++) {
         current += direction;
-        if (current == -1) current = cfg.numrows - 1;
-        else if (current == cfg.numrows) current = 0;
+        if (current == -1) current = E.buffer.num_rows - 1;
+        else if (current == E.buffer.num_rows) current = 0;
 
-        erow *row   = &cfg.er[current];
+        Row  *row   = &E.buffer.rows[current];
         char *match = strstr(row->render, query);
         if (match) {
-            last_match = current;
-            cfg.y      = current;
-            cfg.x      = editorRowRxToX(row, match - row->render);
-            cfg.rowoff = cfg.numrows;
+            last_match         = current;
+            E.cursor.y         = current;
+            E.cursor.x         = editorRowRxToX(row, match - row->render);
+            E.viewport.row_off = E.buffer.num_rows;
 
             saved_hl_line = current;
             saved_hl      = malloc(row->rsize);
@@ -58,18 +58,18 @@ void editorFindCallback(char *query, int key) {
 }
 
 void editorFind() {
-    int saved_x      = cfg.x;
-    int saved_y      = cfg.y;
-    int saved_coloff = cfg.coloff;
-    int saved_rowoff = cfg.rowoff;
+    int saved_x      = E.cursor.x;
+    int saved_y      = E.cursor.y;
+    int saved_coloff = E.viewport.col_off;
+    int saved_rowoff = E.viewport.row_off;
 
     char *query = editorPrompt("/%s", editorFindCallback);
     if (query) {
         free(query);
     } else {
-        cfg.x      = saved_x;
-        cfg.y      = saved_y;
-        cfg.coloff = saved_coloff;
-        cfg.rowoff = saved_rowoff;
+        E.cursor.x         = saved_x;
+        E.cursor.y         = saved_y;
+        E.viewport.col_off = saved_coloff;
+        E.viewport.row_off = saved_rowoff;
     }
 }

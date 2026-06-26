@@ -39,7 +39,7 @@ int readKey(void) {
 void processKey(void) {
     int c = readKey();
 
-    switch (cfg.mode) {
+    switch (E.mode) {
     case MODE_INSERT: handleInsertModeKey(c); break;
     case MODE_NORMAL: handleNormalModeKey(c); break;
     case MODE_COMMAND: handleCommandModeKey(c); break;
@@ -49,11 +49,11 @@ void processKey(void) {
 
 void handleNormalModeKey(int c) {
     /* grab current row cursor is on */
-    erow *row = (cfg.y >= cfg.numrows) ? NULL : &cfg.er[cfg.y];
+    Row *row = (E.cursor.y >= E.buffer.num_rows) ? NULL : &E.buffer.rows[E.cursor.y];
 
     switch (c) {
     /* QUIT  */
-    case CTRL_KEY('q'):
+    case CTRL_KEY('c'):
         clearScreen();
         exit(0);
         editorQuit(false);
@@ -61,29 +61,29 @@ void handleNormalModeKey(int c) {
 
     case CTRL_KEY('s'): editorSave(); break;
 
-    case LEADER: handleLeaderKeyBind(); break;
+    case LEADER: handleLeaderKey(); break;
 
     case '/': editorFind(); break;
 
     case 'o': {
-        Pos target = actionInsertLineBelowCursor();
-        cfg.x      = target.x;
-        cfg.y      = target.y;
-        cfg.mode   = MODE_INSERT;
+        Pos target  = actionInsertLineBelowCursor();
+        E.cursor.x  = target.x;
+        E.cursor.y  = target.y;
+        E.mode      = MODE_INSERT;
         break;
     }
 
     case 'O': {
-        Pos target = actionInsertLineAboveCursor();
-        cfg.x      = target.x;
-        cfg.y      = target.y;
-        cfg.mode   = MODE_INSERT;
+        Pos target  = actionInsertLineAboveCursor();
+        E.cursor.x  = target.x;
+        E.cursor.y  = target.y;
+        E.mode      = MODE_INSERT;
         break;
     }
 
     /* COMPLEX MOTIONS */
     case 'G': {
-        int scrl_down = cfg.numrows;
+        int scrl_down = E.buffer.num_rows;
         while (scrl_down--) {
             moveCursor('j');
         }
@@ -92,76 +92,76 @@ void handleNormalModeKey(int c) {
     case 'g': {
         int d = readKey();
         switch (d) {
-        case 'g': cfg.y = 0; break;
+        case 'g': E.cursor.y = 0; break;
         default: break;
         }
     }
 
     case '$': {
         Pos target = motionLineLastChar();
-        cfg.x      = target.x;
-        cfg.y      = target.y;
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
         break;
-        erow *row = (cfg.y >= cfg.numrows) ? NULL : &cfg.er[cfg.y];
-        if (row && row->size > 0) { cfg.x = strlen(row->chars) - 1; }
+        Row *row = (E.cursor.y >= E.buffer.num_rows) ? NULL : &E.buffer.rows[E.cursor.y];
+        if (row && row->size > 0) { E.cursor.x = strlen(row->chars) - 1; }
     } break;
 
-    case '^': cfg.x = 0; break;
+    case '^': E.cursor.x = 0; break;
 
-    case 'i': cfg.mode = MODE_INSERT; break;
+    case 'i': E.mode = MODE_INSERT; break;
 
     case 'a':
-        cfg.mode = MODE_INSERT;
-        cfg.x++;
+        E.mode = MODE_INSERT;
+        E.cursor.x++;
         break;
 
     case ':':
-        cfg.mode       = MODE_COMMAND;
-        cfg.cmdline[0] = ':';
-        cfg.cmdline[1] = '\0';
+        E.mode          = MODE_COMMAND;
+        E.ui.cmdline[0] = ':';
+        E.ui.cmdline[1] = '\0';
         break;
 
-    case 'v': cfg.mode = MODE_VISUAL; break;
+    case 'v': E.mode = MODE_VISUAL; break;
 
     case 'w': {
         Pos target = motionWordForward();
-        cfg.x      = target.x;
-        cfg.y      = target.y;
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
         break;
     }
 
     case 'W': {
         Pos target = motionWordForwardBig();
-        cfg.x      = target.x;
-        cfg.y      = target.y;
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
         break;
     }
 
     case 'e': {
         Pos target = motionWordEnd();
-        cfg.x      = target.x;
-        cfg.y      = target.y;
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
         break;
     }
 
     case 'E': {
         Pos target = motionWordEndBig();
-        cfg.x      = target.x;
-        cfg.y      = target.y;
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
         break;
     }
 
     case 'b': {
         Pos target = motionWordBackwards();
-        cfg.x      = target.x;
-        cfg.y      = target.y;
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
         break;
     }
 
     case 'B': {
         Pos target = motionWordBackwardsBig();
-        cfg.x      = target.x;
-        cfg.y      = target.y;
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
     }
 
     /* BASIC MOTIONS */
@@ -189,8 +189,8 @@ void handleCommandModeKey(int c) {
     case BACKSPACE: commandDelChar(); break;
 
     case '\x1b':
-        cfg.mode       = MODE_NORMAL;
-        cfg.cmdline[0] = '\0';
+        E.mode          = MODE_NORMAL;
+        E.ui.cmdline[0] = '\0';
         break;
     default: commandInsertChar(c);
     }
@@ -212,8 +212,8 @@ void handleInsertModeKey(int c) {
     case BACKSPACE: editorDelChar(); break;
 
     case '\x1b':
-        cfg.mode = MODE_NORMAL;
-        cfg.x--;
+        E.mode = MODE_NORMAL;
+        E.cursor.x--;
         break;
 
     case ARROW_DOWN:
@@ -226,7 +226,7 @@ void handleInsertModeKey(int c) {
     return;
 }
 
-void handleLeaderKeyBind(void) {
+void handleLeaderKey(void) {
     return;
 }
 //   int c = readKey();

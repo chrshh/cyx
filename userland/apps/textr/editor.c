@@ -7,132 +7,164 @@
 #include <fcntl.h>
 #include "textr.h"
 
-void initEditor(EditorConfig *cfg) {
-    cfg->mode           = MODE_NORMAL;
-    cfg->x              = 0;
-    cfg->y              = 0;
-    cfg->rowoff         = 0;
-    cfg->coloff         = 0;
-    cfg->numrows        = 0;
-    cfg->er             = NULL;
-    cfg->dirty          = false;
-    cfg->rx             = 0;
-    cfg->filename       = NULL;
-    cfg->statusmsg[0]   = '\0';
-    cfg->statusmsg_time = 0;
-    cfg->cmdline[0]     = '\0';
-    cfg->syntax         = NULL;
-    if (getWindowSize(&cfg->rows, &cfg->cols) == -1) die("getWindowSize");
-    cfg->rows -= 2; // these rows are reserved for the status bar(s) at the bottom
+void initEditor(Editor *e) {
+    e->mode             = MODE_NORMAL;
+    e->cursor.x         = 0;
+    e->cursor.y         = 0;
+    e->cursor.rx        = 0;
+    e->viewport.row_off = 0;
+    e->viewport.col_off = 0;
+    e->buffer.num_rows  = 0;
+    e->buffer.rows      = NULL;
+    e->buffer.dirty     = false;
+    e->buffer.filename  = NULL;
+    e->ui.msg[0]        = '\0';
+    e->ui.msg_time      = 0;
+    e->ui.cmdline[0]    = '\0';
+    e->syntax           = NULL;
+    if (getWindowSize(&e->viewport.height, &e->viewport.width) == -1) die("getWindowSize");
+    e->viewport.height -= 2; // these rows are reserved for the status bar(s) at the bottom
 }
 
-void repositionCursorTL(wBuf *wb) {
-    wBufAppend(wb, CURSOR_TL, 3);
+void repositionCursorTL(WriteBuf *wb) {
+    writeBufAppend(wb, CURSOR_TL, 3);
 }
 
 /* draw fn for entire editor */
-void drawRows(wBuf *wb) {
+void drawRows(WriteBuf *wb) {
     int y;
-    for (y = 0; y < cfg.rows - 1; y++) {
-        int filerow = y + cfg.rowoff;
-        if (filerow >= cfg.numrows) {
-            if (cfg.numrows == 0 && y == cfg.rows / 3) {
-                char welcome[80];
-                int  welcomelen = snprintf(welcome, sizeof(welcome), "textr -- 0.1");
-                if (welcomelen > cfg.cols) welcomelen = cfg.cols;
-                int padding = (cfg.cols - welcomelen) / 2;
-                if (padding) {
-                    wBufAppend(wb, "~", 1);
-                    padding--;
-                }
-                while (padding--)
-                    wBufAppend(wb, " ", 1);
-                wBufAppend(wb, welcome, welcomelen);
+    for (y = 0; y < E.viewport.height - 1; y++) {
+        int filerow = y + E.viewport.row_off;
+        if (filerow >= E.buffer.num_rows) {
+            if (E.buffer.num_rows == 0 && y == E.viewport.height / 3) {
+                /* welcome screen rendered when no file is selected */
+                welcomeScreen(wb);
             } else {
-                wBufAppend(wb, "~", 1);
+                writeBufAppend(wb, "~", 1);
             }
-
         } else {
-            int len = cfg.er[filerow].rsize - cfg.coloff;
+            int len = E.buffer.rows[filerow].rsize - E.viewport.col_off;
             if (len < 0) len = 0;
-            if (len > cfg.cols) len = cfg.cols;
-            char          *c          = &cfg.er[filerow].render[cfg.coloff];
-            unsigned char *hl         = &cfg.er[filerow].hl[cfg.coloff];
+            if (len > E.viewport.width) len = E.viewport.width;
+            char          *c          = &E.buffer.rows[filerow].render[E.viewport.col_off];
+            unsigned char *hl         = &E.buffer.rows[filerow].hl[E.viewport.col_off];
             char          *curr_color = NULL;
             int            j;
             for (j = 0; j < len; j++) {
                 if (iscntrl(c[j])) {
                     char sym = (c[j] <= 26) ? '@' + c[j] : '?';
-                    wBufAppend(wb, "\x1b[7m", 4);
-                    wBufAppend(wb, &sym, 1);
-                    wBufAppend(wb, "\x1b[m", 3);
-                    if (curr_color != NULL) { wBufAppend(wb, curr_color, strlen(curr_color)); }
+                    writeBufAppend(wb, "\x1b[7m", 4);
+                    writeBufAppend(wb, &sym, 1);
+                    writeBufAppend(wb, "\x1b[m", 3);
+                    if (curr_color != NULL) { writeBufAppend(wb, curr_color, strlen(curr_color)); }
                 } else if (hl[j] == HL_NORMAL) {
                     if (curr_color != NULL) {
-                        wBufAppend(wb, DEF_COLOR, 5);
+                        writeBufAppend(wb, DEF_COLOR, 5);
                         curr_color = NULL;
                     }
-                    wBufAppend(wb, &c[j], 1);
+                    writeBufAppend(wb, &c[j], 1);
                 } else {
                     char *color = editorSyntaxToColor(hl[j]);
                     if (color != curr_color) {
                         curr_color = color;
-                        wBufAppend(wb, color, strlen(color));
+                        writeBufAppend(wb, color, strlen(color));
                     }
-                    wBufAppend(wb, &c[j], 1);
+                    writeBufAppend(wb, &c[j], 1);
                 }
             }
-            wBufAppend(wb, DEF_COLOR, 5);
+            writeBufAppend(wb, DEF_COLOR, 5);
         }
 
-        wBufAppend(wb, "\x1b[K", 3);
-        wBufAppend(wb, "\r\n", 2);
+        writeBufAppend(wb, "\x1b[K", 3);
+        writeBufAppend(wb, "\r\n", 2);
     }
 }
 
-void updateCursorType(wBuf *wb) {
-    switch (cfg.mode) {
-    case MODE_NORMAL: wBufAppend(wb, CURSOR_BLOCK, 5); break;
-    case MODE_COMMAND: wBufAppend(wb, CURSOR_HIDE, 6); break;
-    case MODE_INSERT: wBufAppend(wb, CURSOR_BAR, 5); break;
-    case MODE_VISUAL: wBufAppend(wb, CURSOR_BLOCK, 5); break;
+void welcomeScreen(WriteBuf *wb) {
+    char welcome_title[50];
+    char welcome_desc1[45];
+    char welcome_desc2[60];
+
+    int titlelen = snprintf(welcome_title, sizeof(welcome_title), "asemics -- 0.1");
+    int desclen1 =
+        snprintf(welcome_desc1, sizeof(welcome_desc1), "Asemic - mark-making that resembles text");
+    int desclen2 = snprintf(welcome_desc2, sizeof(welcome_desc2),
+                            " or handwriting but carries no specific literal meaning.");
+
+    if (titlelen > E.viewport.width) titlelen = E.viewport.width;
+    if (desclen1 > E.viewport.width) desclen1 = E.viewport.width;
+    if (desclen2 > E.viewport.width) desclen2 = E.viewport.width;
+
+    int title_padding = (E.viewport.width - titlelen) / 2;
+    int desc_padding1 = (E.viewport.width - desclen1) / 2;
+    int desc_padding2 = (E.viewport.width - desclen2) / 2;
+
+    if (title_padding) {
+        writeBufAppend(wb, "~", 1);
+        title_padding--;
+    }
+
+    /* title */
+    while (title_padding--)
+        writeBufAppend(wb, " ", 1);
+    writeBufAppend(wb, welcome_title, titlelen);
+    writeBufAppend(wb, "\r\n\n", 3);
+
+    /* desc 1 */
+    while (desc_padding1--)
+        writeBufAppend(wb, " ", 1);
+    writeBufAppend(wb, welcome_desc1, desclen1);
+    writeBufAppend(wb, "\r\n", 2);
+
+    /* desc 2 */
+    while (desc_padding2--)
+        writeBufAppend(wb, " ", 1);
+    writeBufAppend(wb, welcome_desc2, desclen2);
+}
+
+void updateCursorShape(WriteBuf *wb) {
+    switch (E.mode) {
+    case MODE_NORMAL: writeBufAppend(wb, CURSOR_BLOCK, 5); break;
+    case MODE_COMMAND: writeBufAppend(wb, CURSOR_HIDE, 6); break;
+    case MODE_INSERT: writeBufAppend(wb, CURSOR_BAR, 5); break;
+    case MODE_VISUAL: writeBufAppend(wb, CURSOR_BLOCK, 5); break;
     default: return;
     }
 }
 
 void refreshScreen(void) {
     editorScroll();
-    wBuf wb = initWBuf();
+    WriteBuf wb = writeBufInit();
 
-    wBufAppend(&wb, CURSOR_HIDE, 6);
-    wBufAppend(&wb, SCREEN_CLEAR, 4);
+    writeBufAppend(&wb, CURSOR_HIDE, 6);
+    writeBufAppend(&wb, SCREEN_CLEAR, 4);
     repositionCursorTL(&wb);
     drawRows(&wb);
 
     char buf[32];
     int  n;
 
-    n = snprintf(buf, sizeof(buf), "\x1b[%d;1H", cfg.rows + 1);
-    wBufAppend(&wb, buf, n);
+    n = snprintf(buf, sizeof(buf), "\x1b[%d;1H", E.viewport.height + 1);
+    writeBufAppend(&wb, buf, n);
     editorDrawStatusBar(&wb);
 
-    n = snprintf(buf, sizeof(buf), "\x1b[%d;1H", cfg.rows + 2);
-    wBufAppend(&wb, buf, n);
-    if (cfg.cmdline[0] != '\0') {
+    n = snprintf(buf, sizeof(buf), "\x1b[%d;1H", E.viewport.height + 2);
+    writeBufAppend(&wb, buf, n);
+    if (E.ui.cmdline[0] != '\0') {
         editorDrawCmdline(&wb);
     } else {
         editorDrawMsgBar(&wb);
     }
 
-    n = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (cfg.y - cfg.rowoff) + 1,
-                 (cfg.rx - cfg.coloff) + 1);
-    wBufAppend(&wb, buf, n);
+    n = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cursor.y - E.viewport.row_off) + 1,
+                 (E.cursor.rx - E.viewport.col_off) + 1);
+    writeBufAppend(&wb, buf, n);
 
     /* Enabled cursor and render cursor based on EDITOR MODE */
-    wBufAppend(&wb, CURSOR_SHOW, 6);
-    updateCursorType(&wb);
-    write(STDOUT_FILENO, wb.b, wb.len);
-    wBFree(&wb);
+    writeBufAppend(&wb, CURSOR_SHOW, 6);
+    updateCursorShape(&wb);
+    write(STDOUT_FILENO, wb.data, wb.len);
+    writeBufFree(&wb);
 }
 
 void clearScreen(void) {
@@ -140,56 +172,56 @@ void clearScreen(void) {
     write(STDOUT_FILENO, CURSOR_TL, 3);
 }
 
-wBuf initWBuf() {
-    wBuf wb;
-    wb.b   = NULL;
+WriteBuf writeBufInit() {
+    WriteBuf wb;
+    wb.data   = NULL;
     wb.len = 0;
     return wb;
 }
 
-void wBufAppend(wBuf *wb, const char *s, int len) {
-    char *new = realloc(wb->b, wb->len + len);
+void writeBufAppend(WriteBuf *wb, const char *s, int len) {
+    char *new = realloc(wb->data, wb->len + len);
 
     if (new == NULL) return;
     memcpy(&new[wb->len], s, len);
-    wb->b = new;
+    wb->data = new;
     wb->len += len;
 }
 
-void wBFree(wBuf *wb) {
-    free(wb->b);
+void writeBufFree(WriteBuf *wb) {
+    free(wb->data);
 }
 
 void moveCursor(int key) {
-    erow *row = (cfg.y >= cfg.numrows) ? NULL : &cfg.er[cfg.y];
+    Row *row = (E.cursor.y >= E.buffer.num_rows) ? NULL : &E.buffer.rows[E.cursor.y];
     switch (key) {
     case 'h':
     case ARROW_LEFT:
-        if (cfg.x != 0) { cfg.x--; }
+        if (E.cursor.x != 0) { E.cursor.x--; }
         break;
 
     case 'j':
     case ARROW_DOWN:
-        if (cfg.y < cfg.numrows) { cfg.y++; }
+        if (E.cursor.y < E.buffer.num_rows) { E.cursor.y++; }
         break;
 
     case 'k':
     case ARROW_UP:
-        if (cfg.y != 0) { cfg.y--; }
+        if (E.cursor.y != 0) { E.cursor.y--; }
         break;
 
     case 'l':
     case ARROW_RIGHT:
-        if (row && cfg.x < row->size - 1) { cfg.x++; }
+        if (row && E.cursor.x < row->size - 1) { E.cursor.x++; }
         break;
     }
 
-    row        = (cfg.y >= cfg.numrows) ? NULL : &cfg.er[cfg.y];
+    row        = (E.cursor.y >= E.buffer.num_rows) ? NULL : &E.buffer.rows[E.cursor.y];
     int rowlen = row ? row->size : 0;
-    if (cfg.x > rowlen) { cfg.x = rowlen; }
+    if (E.cursor.x > rowlen) { E.cursor.x = rowlen; }
 }
 
-int editorTouchFile(char *filename) {
+int editorCreateFile(char *filename) {
     int fd = open(filename, O_CREAT | O_WRONLY, 0644);
     if (fd == -1) {
         perror(filename);
@@ -201,14 +233,14 @@ int editorTouchFile(char *filename) {
 }
 
 void editorOpen(char *filename) {
-    free(cfg.filename);
-    cfg.filename = strdup(filename);
+    free(E.buffer.filename);
+    E.buffer.filename = strdup(filename);
 
     editorSetSyntaxHighlight();
 
     FILE *fp = fopen(filename, "r");
     if (!fp) {
-        int ok = editorTouchFile(filename);
+        int ok = editorCreateFile(filename);
         if (ok != 0) { die("open & create"); }
         fp = fopen(filename, "r");
     }
@@ -220,37 +252,37 @@ void editorOpen(char *filename) {
         while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r'))
             linelen--;
 
-        editorInsertRow(cfg.numrows, line, linelen);
+        editorInsertRow(E.buffer.num_rows, line, linelen);
     }
     free(line);
     fclose(fp);
-    cfg.dirty = false;
+    E.buffer.dirty = false;
 }
 
 void editorScroll() {
-    cfg.rx = 0;
-    if (cfg.y < cfg.numrows) { cfg.rx = editorRowXtoRx(&cfg.er[cfg.y], cfg.x); }
+    E.cursor.rx = 0;
+    if (E.cursor.y < E.buffer.num_rows) { E.cursor.rx = editorRowXtoRx(&E.buffer.rows[E.cursor.y], E.cursor.x); }
 
-    if (cfg.y < cfg.rowoff) { cfg.rowoff = cfg.y; }
-    if (cfg.y >= cfg.rowoff + cfg.rows) { cfg.rowoff = cfg.y - cfg.rows + 1; }
-    if (cfg.rx < cfg.coloff) { cfg.coloff = cfg.rx; }
-    if (cfg.rx >= cfg.coloff + cfg.cols) { cfg.coloff = cfg.rx - cfg.cols + 1; }
+    if (E.cursor.y < E.viewport.row_off) { E.viewport.row_off = E.cursor.y; }
+    if (E.cursor.y >= E.viewport.row_off + E.viewport.height) { E.viewport.row_off = E.cursor.y - E.viewport.height + 1; }
+    if (E.cursor.rx < E.viewport.col_off) { E.viewport.col_off = E.cursor.rx; }
+    if (E.cursor.rx >= E.viewport.col_off + E.viewport.width) { E.viewport.col_off = E.cursor.rx - E.viewport.width + 1; }
 }
 
 char *editorRowsToStr(int *buflen) {
     int totallen = 0;
     int j;
 
-    for (j = 0; j < cfg.numrows; j++)
-        totallen += cfg.er[j].size + 1;
+    for (j = 0; j < E.buffer.num_rows; j++)
+        totallen += E.buffer.rows[j].size + 1;
     *buflen = totallen;
 
     char *buf = malloc(totallen);
     char *p   = buf;
 
-    for (j = 0; j < cfg.numrows; j++) {
-        memcpy(p, cfg.er[j].chars, cfg.er[j].size);
-        p += cfg.er[j].size;
+    for (j = 0; j < E.buffer.num_rows; j++) {
+        memcpy(p, E.buffer.rows[j].chars, E.buffer.rows[j].size);
+        p += E.buffer.rows[j].size;
         *p = '\n';
         p++;
     }
@@ -259,19 +291,19 @@ char *editorRowsToStr(int *buflen) {
 }
 
 void editorSave() {
-    if (cfg.filename == NULL) return;
+    if (E.buffer.filename == NULL) return;
 
     int   len;
     char *buf = editorRowsToStr(&len);
 
-    int fd = open(cfg.filename, O_RDWR | O_CREAT, 0644);
+    int fd = open(E.buffer.filename, O_RDWR | O_CREAT, 0644);
     if (fd != -1) {
         if (ftruncate(fd, len) != -1) {
             if (write(fd, buf, len) == len) {
                 close(fd);
                 free(buf);
-                cfg.dirty      = false;
-                cfg.cmdline[0] = '\0';
+                E.buffer.dirty   = false;
+                E.ui.cmdline[0]  = '\0';
                 editorSetStatusMsg("%d: bytes written to disk", len);
                 editorSetSyntaxHighlight();
                 return;
@@ -289,12 +321,12 @@ void editorQuit(bool force) {
         clearScreen();
         exit(0);
     } else {
-        if (cfg.dirty) {
+        if (E.buffer.dirty) {
             char buf[80];
             int  n = snprintf(buf, sizeof(buf),
-                              "%s has unsaved changes. '!q' to quit without saving", cfg.filename);
+                              "%s has unsaved changes. '!q' to quit without saving", E.buffer.filename);
             int  i = 0;
-            cfg.cmdline[0] = '\0';
+            E.ui.cmdline[0] = '\0';
             while (buf[i] != '\0') {
                 commandInsertChar(buf[i]);
                 i++;

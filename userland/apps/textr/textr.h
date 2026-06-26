@@ -40,6 +40,7 @@
 #define MLCOMMENT "\x1b[90m"
 #define MATCH     "\x1b[35m"
 #define OPERATOR  BLUE
+#define RESET     "\x1b[0m"
 
 /* global state */
 typedef enum { MODE_NORMAL, MODE_INSERT, MODE_COMMAND, MODE_VISUAL } EditorMode;
@@ -67,41 +68,57 @@ typedef struct {
     int    flags;
 } EditorSyntax;
 
-typedef struct erow {
-    int            idx;
-    int            size;
-    int            rsize;
-    char          *chars;
-    char          *render;
-    unsigned char *hl;
-    int            hl_open_comment;
-} erow;
+typedef struct Row {
+    int            idx;             /* this row's position in the buffer */
+    int            size;            /* length of `chars` (raw line bytes) */
+    int            rsize;           /* length of `render` (after tab expansion) */
+    char          *chars;           /* raw line text as stored in the file */
+    char          *render;          /* line as drawn on screen (tabs expanded etc.) */
+    unsigned char *hl;              /* per-cell highlight codes, same length as `render` */
+    int            hl_open_comment; /* true if this row ends inside an unclosed multi-line comment */
+} Row;
 
-typedef struct EditorConfig {
-    EditorMode     mode;
-    int            rows;
-    int            cols;
-    int            rowoff;
-    int            coloff;
-    int            x;
-    int            y;
-    int            rx;
-    int            numrows;
-    erow          *er;
-    bool           dirty;
-    char          *filename;
-    char           statusmsg[80];
-    time_t         statusmsg_time;
-    char           cmdline[80];
-    EditorSyntax  *syntax;
-    struct termios orig_term;
-} EditorConfig;
+typedef struct {
+    int x;  /* cursor column in the buffer (logical char index, ignores tabs) */
+    int y;  /* cursor row in the buffer (line index) */
+    int rx; /* cursor column on screen (`x` with tabs expanded) */
+} Cursor;
+
+typedef struct {
+    int height;  /* number of visible rows on screen */
+    int width;   /* number of visible columns on screen */
+    int row_off; /* topmost visible buffer row (vertical scroll offset) */
+    int col_off; /* leftmost visible column (horizontal scroll offset) */
+} Viewport;
+
+typedef struct {
+    Row  *rows;     /* dynamic array of rows — the document contents */
+    int   num_rows; /* number of rows currently in `rows` */
+    bool  dirty;    /* true if there are unsaved changes */
+    char *filename; /* path to the open file (NULL when unnamed) */
+} Buffer;
+
+typedef struct {
+    char   msg[80];     /* transient status message shown at the bottom */
+    time_t msg_time;    /* when `msg` was set, used to time it out */
+    char   cmdline[80]; /* text being typed in command mode (`:w`, `:q`, ...) */
+} StatusBar;
+
+typedef struct Editor {
+    EditorMode     mode;      /* current modal state (normal/insert/command/visual) */
+    Cursor         cursor;    /* where the cursor is */
+    Viewport       viewport;  /* what slice of the buffer is visible */
+    Buffer         buffer;    /* the document being edited */
+    StatusBar      ui;        /* bottom-bar state: status message + command line */
+    EditorSyntax  *syntax;    /* active syntax-highlight rules (NULL = none) */
+    struct termios orig_term; /* termios snapshot from before raw mode, restored on exit */
+} Editor;
 
 /* write buffer */
 typedef struct {
-    char *b;
+    char *data;
     int   len;
-} wBuf;
+} WriteBuf;
 
 /* position struct for motions */
 typedef struct {
@@ -109,7 +126,7 @@ typedef struct {
     int y;
 } Pos;
 
-extern EditorConfig cfg;
+extern Editor E;
 
 /* terminal.c */
 void die(const char *s);
@@ -125,55 +142,56 @@ void handleInsertModeKey(int c);
 void handleVisualModeKey(int c);
 void handleCommandModeKey(int c);
 void handleNormalModeKey(int c);
-void handleLeaderKeyBind(void);
+void handleLeaderKey(void);
 
 /* editor.c */
 void  refreshScreen(void);
 void  clearScreen(void);
-void  drawRows(wBuf *wb);
-void  initEditor(EditorConfig *cfg);
-wBuf  initWBuf(void);
-void  wBFree(wBuf *wb);
-void  wBufAppend(wBuf *wb, const char *s, int len);
+void  drawRows(WriteBuf *wb);
+void  initEditor(Editor *e);
+WriteBuf  writeBufInit(void);
+void  writeBufFree(WriteBuf *wb);
+void  writeBufAppend(WriteBuf *wb, const char *s, int len);
 void  moveCursor(int key);
 void  editorOpen(char *filename);
 void  editorScroll(void);
-void  updateCursorType(wBuf *wb);
+void  updateCursorShape(WriteBuf *wb);
 void  editorQuit(bool force);
 void  editorSave(void);
-int   editorTouchFile(char *filename);
+int   editorCreateFile(char *filename);
 char *editorPrompt(char *prompt, void (*callback)(char *, int));
+void  welcomeScreen(WriteBuf *wb);
 
 /* rows.c */
 void  editorInsertRow(int pos, char *s, size_t len);
 void  editorInsertNewLine();
-void  editorUpdateRow(erow *er);
-int   editorRowXtoRx(erow *er, int x);
-int   editorRowRxToX(erow *er, int rx);
-void  editorRowInsertChar(erow *er, int pos, int c);
+void  editorUpdateRow(Row *row);
+int   editorRowXtoRx(Row *row, int x);
+int   editorRowRxToX(Row *row, int rx);
+void  editorRowInsertChar(Row *row, int pos, int c);
 void  editorInsertChar(int c);
 char *editorRowsToStr(int *buflen);
-void  editorRowDelChar(erow *er, int pos);
+void  editorRowDelChar(Row *row, int pos);
 void  editorDelChar(void);
-void  editorFreeRow(erow *er);
+void  editorFreeRow(Row *row);
 void  editorDelRow(int pos);
-void  editorRowAppendString(erow *er, char *s, size_t len);
+void  editorRowAppendString(Row *row, char *s, size_t len);
 
 /* statbar.c */
-void  editorDrawStatusBar(wBuf *wb);
+void  editorDrawStatusBar(WriteBuf *wb);
 char *getModeStr(void);
 void  editorSetStatusMsg(const char *fmt, ...);
-void  editorDrawMsgBar(wBuf *wb);
+void  editorDrawMsgBar(WriteBuf *wb);
 
 /* commands.c */
 int  parseCommands(char *cmd, int len);
 void execCommands(void);
 void commandInsertChar(int c);
 void commandDelChar(void);
-void editorDrawCmdline(wBuf *wb);
+void editorDrawCmdline(WriteBuf *wb);
 
 /* syntax_hl.c */
-void  editorUpdateSyntax(erow *row);
+void  editorUpdateSyntax(Row *row);
 char *editorSyntaxToColor(int hl);
 int   is_separator(int c);
 int   is_operator(int c);

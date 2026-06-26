@@ -26,9 +26,9 @@ static int charType(int c) {
 
 /* -- w -- */
 Pos motionWordForward(void) {
-    Pos p = { cfg.x, cfg.y };
-    if (p.y >= cfg.numrows) return p;
-    erow *row = &cfg.er[p.y];
+    Pos p = { E.cursor.x, E.cursor.y };
+    if (p.y >= E.buffer.num_rows) return p;
+    Row *row = &E.buffer.rows[p.y];
 
     if (p.x < row->size && charType(row->chars[p.x]) != TYPE_SPACE) {
         int start_type = charType(row->chars[p.x]);
@@ -38,13 +38,13 @@ Pos motionWordForward(void) {
     }
     while (1) {
         if (p.x >= row->size) {
-            if (p.y + 1 >= cfg.numrows) {
+            if (p.y + 1 >= E.buffer.num_rows) {
                 p.x = row->size;
                 return p;
             }
             p.y++;
             p.x = 0;
-            row = &cfg.er[p.y];
+            row = &E.buffer.rows[p.y];
 
             if (row->size == 0) return p;
             continue;
@@ -56,9 +56,9 @@ Pos motionWordForward(void) {
 
 /* -- W -- */
 Pos motionWordForwardBig(void) {
-    Pos p = { cfg.x, cfg.y };
-    if (p.y >= cfg.numrows) return p;
-    erow *row = &cfg.er[p.y];
+    Pos p = { E.cursor.x, E.cursor.y };
+    if (p.y >= E.buffer.num_rows) return p;
+    Row *row = &E.buffer.rows[p.y];
     if (p.x < row->size && charType(row->chars[p.x]) != TYPE_SPACE) {
         while (p.x < row->size && charType(row->chars[p.x]) != TYPE_SPACE) {
             p.x++;
@@ -66,13 +66,13 @@ Pos motionWordForwardBig(void) {
     }
     while (1) {
         if (p.x >= row->size) {
-            if (p.y + 1 >= cfg.numrows) {
+            if (p.y + 1 >= E.buffer.num_rows) {
                 p.x = row->size;
                 return p;
             }
             p.y++;
             p.x = 0;
-            row = &cfg.er[p.y];
+            row = &E.buffer.rows[p.y];
 
             if (row->size == 0) return p;
             continue;
@@ -84,15 +84,15 @@ Pos motionWordForwardBig(void) {
 
 /* -- b -- */
 Pos motionWordBackwards(void) {
-    Pos p = { cfg.x, cfg.y };
-    if (p.y >= cfg.numrows) return p;
-    erow *row = &cfg.er[p.y];
+    Pos p = { E.cursor.x, E.cursor.y };
+    if (p.y >= E.buffer.num_rows) return p;
+    Row *row = &E.buffer.rows[p.y];
 
     p.x--;
     if (p.x < 0) {
         if (p.y == 0) return p;
         p.y--;
-        row = &cfg.er[p.y];
+        row = &E.buffer.rows[p.y];
         p.x = row->size ? row->size - 1 : 0;
         if (row->size == 0) return p;
     }
@@ -104,7 +104,7 @@ Pos motionWordBackwards(void) {
                 return p;
             }
             p.y--;
-            row = &cfg.er[p.y];
+            row = &E.buffer.rows[p.y];
             p.x = row->size > 0 ? row->size - 1 : 0;
             if (row->size == 0) return p;
             continue;
@@ -122,15 +122,15 @@ Pos motionWordBackwards(void) {
 
 /* -- B -- */
 Pos motionWordBackwardsBig(void) {
-    Pos p = { cfg.x, cfg.y };
-    if (p.y >= cfg.numrows) return p;
-    erow *row = &cfg.er[p.y];
+    Pos p = { E.cursor.x, E.cursor.y };
+    if (p.y >= E.buffer.num_rows) return p;
+    Row *row = &E.buffer.rows[p.y];
 
     p.x--;
     if (p.x < 0) {
         if (p.y == 0) return p;
         p.y--;
-        row = &cfg.er[p.y];
+        row = &E.buffer.rows[p.y];
         p.x = row->size ? row->size - 1 : 0;
         if (row->size == 0) return p;
     }
@@ -142,7 +142,7 @@ Pos motionWordBackwardsBig(void) {
                 return p;
             }
             p.y--;
-            row = &cfg.er[p.y];
+            row = &E.buffer.rows[p.y];
             p.x = row->size > 0 ? row->size - 1 : 0;
             if (row->size == 0) return p;
             continue;
@@ -159,31 +159,31 @@ Pos motionWordBackwardsBig(void) {
 
 /* -- e --  */
 Pos motionWordEnd(void) {
-    Pos p = { cfg.x, cfg.y };
-    if (p.y >= cfg.numrows) return p;
-    erow *row = &cfg.er[p.y];
+    Pos p = { E.cursor.x, E.cursor.y };
+    if (p.y >= E.buffer.num_rows) return p;
+    Row *row = &E.buffer.rows[p.y];
 
     p.x++;
     if (p.x >= row->size) {
-        if (p.y + 1 >= cfg.numrows) {
+        if (p.y + 1 >= E.buffer.num_rows) {
             p.x = row->size > 0 ? row->size - 1 : 0;
             return p;
         }
         p.y++;
         p.x = 0;
-        row = &cfg.er[p.y];
+        row = &E.buffer.rows[p.y];
     }
 
     /* skip whitespace & jump lines as needed */
     while (1) {
         if (p.x >= row->size) {
-            if (p.y + 1 >= cfg.numrows) {
+            if (p.y + 1 >= E.buffer.num_rows) {
                 p.x = row->size > 0 ? row->size - 1 : 0;
                 return p;
             }
             p.y++;
             p.x = 0;
-            row = &cfg.er[p.y];
+            row = &E.buffer.rows[p.y];
             continue;
         }
         if (charType(row->chars[p.x]) != TYPE_SPACE) break;
@@ -200,30 +200,30 @@ Pos motionWordEnd(void) {
 
 /* -- E -- */
 Pos motionWordEndBig(void) {
-    Pos p = { cfg.x, cfg.y };
-    if (p.y >= cfg.numrows) return p;
-    erow *row = &cfg.er[p.y];
+    Pos p = { E.cursor.x, E.cursor.y };
+    if (p.y >= E.buffer.num_rows) return p;
+    Row *row = &E.buffer.rows[p.y];
 
     p.x++;
     if (p.x >= row->size) {
-        if (p.y + 1 >= cfg.numrows) {
+        if (p.y + 1 >= E.buffer.num_rows) {
             p.x = row->size > 0 ? row->size - 1 : 0;
             return p;
         }
         p.y++;
         p.x = 0;
-        row = &cfg.er[p.y];
+        row = &E.buffer.rows[p.y];
     }
 
     while (1) {
         if (p.x >= row->size) {
-            if (p.y + 1 >= cfg.numrows) {
+            if (p.y + 1 >= E.buffer.num_rows) {
                 p.x = row->size > 0 ? row->size - 1 : 0;
                 return p;
             }
             p.y++;
             p.x = 0;
-            row = &cfg.er[p.y];
+            row = &E.buffer.rows[p.y];
             continue;
         }
         if (charType(row->chars[p.x]) != TYPE_SPACE) break;
@@ -238,8 +238,8 @@ Pos motionWordEndBig(void) {
 
 /* -- $ -- */
 Pos motionLineLastChar(void) {
-    Pos   p   = { cfg.x, cfg.y };
-    erow *row = (p.y >= cfg.numrows) ? NULL : &cfg.er[p.y];
+    Pos   p   = { E.cursor.x, E.cursor.y };
+    Row  *row = (p.y >= E.buffer.num_rows) ? NULL : &E.buffer.rows[p.y];
     if (row && row->size > 0) { p.x = strlen(row->chars) - 1; }
     return p;
 }
@@ -252,40 +252,40 @@ Pos motionLineLastChar(void) {
 
 /* -- o -- */
 Pos actionInsertLineBelowCursor(void) {
-    erow *row = &cfg.er[cfg.y];
+    Row *row = &E.buffer.rows[E.cursor.y];
 
     int indent = 0;
     while (indent < row->size && (row->chars[indent] == ' ' || row->chars[indent] == '\t')) {
         indent++;
     }
 
-    cfg.x = row->size;
+    E.cursor.x = row->size;
     editorInsertNewLine();
 
     for (int i = 0; i < indent; i++) {
         editorInsertChar(' ');
     }
-    Pos pos = { cfg.x, cfg.y };
+    Pos pos = { E.cursor.x, E.cursor.y };
     return pos;
 }
 
 /* -- O -- */
 Pos actionInsertLineAboveCursor(void) {
-    erow *row = &cfg.er[cfg.y];
+    Row *row = &E.buffer.rows[E.cursor.y];
 
     int indent = 0;
     while (indent < row->size && (row->chars[indent] == ' ' || row->chars[indent] == '\t')) {
         indent++;
     }
 
-    cfg.x = 0;
+    E.cursor.x = 0;
     editorInsertNewLine();
-    cfg.y--;
+    E.cursor.y--;
 
     for (int i = 0; i < indent; i++) {
         editorInsertChar(' ');
     }
 
-    Pos pos = { cfg.x, cfg.y };
+    Pos pos = { E.cursor.x, E.cursor.y };
     return pos;
 }

@@ -17,17 +17,17 @@ EditorSyntax HLDB[] = {
       HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS },
 };
 
-void editorUpdateSyntax(erow *row) {
+void editorUpdateSyntax(Row *row) {
     row->hl = realloc(row->hl, row->rsize);
     memset(row->hl, HL_NORMAL, row->rsize);
 
-    if (cfg.syntax == NULL) return;
+    if (E.syntax == NULL) return;
 
-    char **keywords = cfg.syntax->keywords;
+    char **keywords = E.syntax->keywords;
 
-    char *scs = cfg.syntax->singleline_comment_start;
-    char *mcs = cfg.syntax->multiline_comment_start;
-    char *mce = cfg.syntax->multiline_comment_end;
+    char *scs = E.syntax->singleline_comment_start;
+    char *mcs = E.syntax->multiline_comment_start;
+    char *mce = E.syntax->multiline_comment_end;
 
     int scs_len = scs ? strlen(scs) : 0;
     int mcs_len = mcs ? strlen(mcs) : 0;
@@ -35,7 +35,7 @@ void editorUpdateSyntax(erow *row) {
 
     int prev_sep   = 1;
     int in_str     = 0;
-    int in_comment = (row->idx > 0 && cfg.er[row->idx - 1].hl_open_comment);
+    int in_comment = (row->idx > 0 && E.buffer.rows[row->idx - 1].hl_open_comment);
 
     int i = 0;
     while (i < row->rsize) {
@@ -73,7 +73,7 @@ void editorUpdateSyntax(erow *row) {
         }
 
         /* string highlighting */
-        if (cfg.syntax->flags & HL_HIGHLIGHT_STRINGS) {
+        if (E.syntax->flags & HL_HIGHLIGHT_STRINGS) {
             if (in_str) {
                 row->hl[i] = HL_STRING;
                 if (c == '\\' && i + 1 < row->rsize) {
@@ -96,7 +96,7 @@ void editorUpdateSyntax(erow *row) {
         }
 
         /* number highlighting */
-        if (cfg.syntax->flags & HL_HIGHLIGHT_NUMBERS) {
+        if (E.syntax->flags & HL_HIGHLIGHT_NUMBERS) {
             if ((isdigit(c) && (prev_sep || prev_hl == HL_NUMBER)) ||
                 (c == '.' && prev_hl == HL_NUMBER)) {
                 row->hl[i] = HL_NUMBER;
@@ -140,7 +140,7 @@ void editorUpdateSyntax(erow *row) {
 
     int changed          = (row->hl_open_comment != in_comment);
     row->hl_open_comment = in_comment;
-    if (changed && row->idx + 1 < cfg.numrows) editorUpdateSyntax(&cfg.er[row->idx + 1]);
+    if (changed && row->idx + 1 < E.buffer.num_rows) editorUpdateSyntax(&E.buffer.rows[row->idx + 1]);
 }
 
 char *editorSyntaxToColor(int hl) {
@@ -166,10 +166,10 @@ int is_operator(int c) {
 }
 
 void editorSetSyntaxHighlight(void) {
-    cfg.syntax = NULL;
-    if (cfg.filename == NULL) return;
+    E.syntax = NULL;
+    if (E.buffer.filename == NULL) return;
 
-    char *ext = strchr(cfg.filename, '.');
+    char *ext = strchr(E.buffer.filename, '.');
 
     for (unsigned int j = 0; j < HLDB_ENTRIES; j++) {
         EditorSyntax *syntax = &HLDB[j];
@@ -177,12 +177,12 @@ void editorSetSyntaxHighlight(void) {
         while (syntax->filematch[i]) {
             int is_ext = (syntax->filematch[i][0] == '.');
             if ((is_ext && ext && !strcmp(ext, syntax->filematch[i])) ||
-                (!is_ext && strstr(cfg.filename, syntax->filematch[i]))) {
-                cfg.syntax = syntax;
+                (!is_ext && strstr(E.buffer.filename, syntax->filematch[i]))) {
+                E.syntax = syntax;
 
                 int filerow;
-                for (filerow = 0; filerow < cfg.numrows; filerow++) {
-                    editorUpdateSyntax(&cfg.er[filerow]);
+                for (filerow = 0; filerow < E.buffer.num_rows; filerow++) {
+                    editorUpdateSyntax(&E.buffer.rows[filerow]);
                 }
                 return;
             }

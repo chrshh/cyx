@@ -3,11 +3,11 @@
 
 #include "textr.h"
 
-EditorConfig cfg;
+Editor E;
 
 int main(int argc, char **argv) {
   enableRawMode();
-  initEditor(&cfg);
+  initEditor(&E);
   if (argc >= 2) {
     editorOpen(argv[1]);
   }

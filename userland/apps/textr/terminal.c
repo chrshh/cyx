@@ -13,13 +13,13 @@ void die(const char *s) {
 }
 
 void disableRawMode(void) {
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &cfg.orig_term) == -1) die("tcsetattr");
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_term) == -1) die("tcsetattr");
 }
 
 void enableRawMode(void) {
-  if (tcgetattr(STDIN_FILENO, &cfg.orig_term) == -1) die("tcgetattr");
+  if (tcgetattr(STDIN_FILENO, &E.orig_term) == -1) die("tcgetattr");
   atexit(disableRawMode);
-  struct termios raw = cfg.orig_term;
+  struct termios raw = E.orig_term;
   raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
   raw.c_oflag &= ~(OPOST);
   raw.c_cflag |= (CS8);

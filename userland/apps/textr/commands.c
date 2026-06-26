@@ -30,7 +30,7 @@ int parseCommands(char *cmd, int len) {
 }
 
 void execCommands() {
-  char *cmd = cfg.cmdline;
+  char *cmd = E.ui.cmdline;
   int len = strlen(cmd);
 
   int cmds = parseCommands(cmd, len);
@@ -56,29 +56,29 @@ void execCommands() {
     }
   }
 
-  cfg.mode = MODE_NORMAL;
+  E.mode = MODE_NORMAL;
 }
 
 void commandInsertChar(int c) {
-  int n = strlen(cfg.cmdline);
+  int n = strlen(E.ui.cmdline);
   if (n >= 80) {
     return;
   }
-  cfg.cmdline[n] = c;
-  cfg.cmdline[n + 1] = '\0';
+  E.ui.cmdline[n] = c;
+  E.ui.cmdline[n + 1] = '\0';
   return;
 }
 
 void commandDelChar(void) {
-  int n = strlen(cfg.cmdline);
+  int n = strlen(E.ui.cmdline);
   if (n == 1) return;
-  cfg.cmdline[n - 1] = '\0';
+  E.ui.cmdline[n - 1] = '\0';
   return;
 }
 
-void editorDrawCmdline(wBuf *wb) {
-  wBufAppend(wb, "\x1b[K", 3);
-  int cmdlen = strlen(cfg.cmdline);
-  if (cmdlen > cfg.cols) cmdlen = cfg.cols;
-  wBufAppend(wb, cfg.cmdline, cmdlen);
+void editorDrawCmdline(WriteBuf *wb) {
+  writeBufAppend(wb, "\x1b[K", 3);
+  int cmdlen = strlen(E.ui.cmdline);
+  if (cmdlen > E.viewport.width) cmdlen = E.viewport.width;
+  writeBufAppend(wb, E.ui.cmdline, cmdlen);
 }
