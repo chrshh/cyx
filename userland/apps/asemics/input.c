@@ -61,16 +61,23 @@ void handleNormalModeKey(int c) {
 
         /* special actions */
     case CTRL_KEY('s'): editorSave(); break;
-
     case LEADER: handleLeaderKey(); break;
+    case '/': editorFind(); break;
 
-    case '/':
-        editorFind();
+    case 'u': {
+        historyUndo();
         break;
+    }
+
+    case CTRL_KEY('r'): {
+        historyRedo();
+        break;
+    }
 
         /* ***** motion keys only ***** */
 
     case 'o': {
+        historyCheckpoint(row);
         Pos target = actionInsertLineBelowCursor();
         E.cursor.x = target.x;
         E.cursor.y = target.y;
@@ -79,6 +86,7 @@ void handleNormalModeKey(int c) {
     }
 
     case 'O': {
+        historyCheckpoint(row);
         Pos target = actionInsertLineAboveCursor();
         E.cursor.x = target.x;
         E.cursor.y = target.y;
@@ -166,12 +174,13 @@ void handleNormalModeKey(int c) {
 
     /* enter insert mode */
     case 'i':
-        historyCheckpoint();
+        if (!E.buffer.filename) return;
+        historyCheckpoint(row);
         E.mode = MODE_INSERT;
         break;
 
     case 'a':
-        historyCheckpoint();
+        historyCheckpoint(row);
         E.mode = MODE_INSERT;
         E.cursor.x++;
         break;

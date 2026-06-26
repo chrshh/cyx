@@ -11,10 +11,11 @@ History *initHistory() {
     return h;
 }
 
-/* responsible for adding entry to history */
-void historyCheckpoint() {
-    /* grab current row cursor is on */
-    Row *curr_row = &E.buffer.rows[E.cursor.y];
+/* responsible for adding entry to history and resizing if needed */
+void historyCheckpoint(Row *curr_row) {
+    if (E.history->length >= E.history->capacity) { historyResize(); }
+
+    E.history->length = E.history->curr_idx;
 
     Row    row_copy    = deepCopyRow(curr_row);
     Cursor cursor_copy = deepCopyCursor(&E.cursor);
@@ -23,14 +24,49 @@ void historyCheckpoint() {
     new_entry.cursor = cursor_copy;
     new_entry.row    = row_copy;
 
+    /* add entry and align length + current index */
     E.history->records[E.history->length] = new_entry;
     E.history->length++;
-    addDbgLog("RENDER: %s | LEN: %d", E.history->records->row.render, E.history->length);
+    E.history->curr_idx = E.history->length;
+    addDbgLog("RENDER: %s | LEN: %d", E.history->records[E.history->length - 1].row.render,
+              E.history->length);
 };
 
-void historyUndo() {};
+void historyUndo() {
+    /* base case of no more history to see */
+    if (E.history->curr_idx < 1) {
+        editorSetStatusMsg("Already at earliest history");
+        return;
+    }
 
-void historyRedo() {};
+    /* stash current state once so redo always has a target */
+    if (E.history->length == E.history->curr_idx) {
+        if (E.history->length >= E.history->capacity) historyResize();
+        Row *cur                                     = &E.buffer.rows[E.cursor.y];
+        E.history->records[E.history->length].row    = deepCopyRow(cur);
+        E.history->records[E.history->length].cursor = deepCopyCursor(&E.cursor);
+        E.history->length++;
+    }
+
+    HistoryItem *entry = &E.history->records[E.history->curr_idx - 1];
+    editorFreeRow(&E.buffer.rows[entry->cursor.y]);
+    E.buffer.rows[entry->cursor.y] = deepCopyRow(&entry->row);
+    E.cursor                       = entry->cursor;
+    E.history->curr_idx--;
+};
+
+void historyRedo() {
+    if (E.history->curr_idx + 1 >= E.history->length) {
+        editorSetStatusMsg("Already at latest history");
+        return;
+    }
+
+    HistoryItem *entry = &E.history->records[E.history->curr_idx + 1];
+    editorFreeRow(&E.buffer.rows[entry->cursor.y]);
+    E.buffer.rows[entry->cursor.y] = deepCopyRow(&entry->row);
+    E.cursor                       = entry->cursor;
+    E.history->curr_idx++;
+};
 
 /* row struct contains char* types that need to get deep copied */
 Row deepCopyRow(Row *og_row) {
@@ -58,4 +94,10 @@ Cursor deepCopyCursor(Cursor *og_cursor) {
     cursor.x  = og_cursor->x;
     cursor.y  = og_cursor->y;
     return cursor;
+}
+
+/* doubles capacity when called && reallocs records mem */
+void historyResize() {
+    E.history->capacity *= 2;
+    E.history->records = realloc(E.history->records, sizeof(HistoryItem) * E.history->capacity);
 }

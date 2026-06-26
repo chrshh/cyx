@@ -223,7 +223,8 @@ void  editorSetSyntaxHighlight(void);
 
 /* history.c */
 History *initHistory();
-void     historyCheckpoint();
+void     historyResize();
+void     historyCheckpoint(Row *row);
 void     historyUndo();
 void     historyRedo();
 Row      deepCopyRow(Row *og_row);
