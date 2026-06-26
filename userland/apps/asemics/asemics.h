@@ -28,6 +28,8 @@
 #define STATUS_BAR_RESERVE 2
 #define LINE_NUM_RESERVE   8
 
+#define SCROLL_OFF 5
+
 /* commands */
 #define SAVE  (1 << 0)
 #define QUIT  (1 << 1)
@@ -166,6 +168,7 @@ void     editorSave(void);
 int      editorCreateFile(char *filename);
 char    *editorPrompt(char *prompt, void (*callback)(char *, int));
 void     welcomeScreen(WriteBuf *wb);
+void     drawLineNums(WriteBuf *wb, int filerow);
 
 /* rows.c */
 void  editorInsertRow(int pos, char *s, size_t len);

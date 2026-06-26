@@ -34,6 +34,7 @@ void editorInsertNewLine(void) {
         Row *er = &E.buffer.rows[E.cursor.y];
         editorInsertRow(E.cursor.y + 1, &er->chars[E.cursor.x], er->size - E.cursor.x);
         er                  = &E.buffer.rows[E.cursor.y];
+        er->size            = E.cursor.x;
         er->chars[er->size] = '\0';
         editorUpdateRow(er);
     }
@@ -115,7 +116,8 @@ void editorFreeRow(Row *er) {
 void editorDelRow(int pos) {
     if (pos < 0 || pos >= E.buffer.num_rows) return;
     editorFreeRow(&E.buffer.rows[pos]);
-    memmove(&E.buffer.rows[pos], &E.buffer.rows[pos + 1], sizeof(Row) * (E.buffer.num_rows - pos - 1));
+    memmove(&E.buffer.rows[pos], &E.buffer.rows[pos + 1],
+            sizeof(Row) * (E.buffer.num_rows - pos - 1));
     for (int j = pos; j < E.buffer.num_rows - 1; j++)
         E.buffer.rows[j].idx--;
     E.buffer.num_rows--;

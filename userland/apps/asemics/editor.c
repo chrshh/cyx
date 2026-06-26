@@ -35,9 +35,7 @@ void repositionCursorTL(WriteBuf *wb) {
 void drawRows(WriteBuf *wb) {
     int y;
     for (y = 0; y < E.viewport.height; y++) {
-        int  filerow = y + E.viewport.row_off;
-        char gutter[24];
-        int  glen;
+        int filerow = y + E.viewport.row_off;
 
         if (filerow >= E.buffer.num_rows) {
             if (E.buffer.num_rows == 0 && y == E.viewport.height / 3) {
@@ -47,22 +45,26 @@ void drawRows(WriteBuf *wb) {
                 writeBufAppend(wb, "~", 1);
             }
         } else {
-            glen = snprintf(gutter, sizeof(gutter), "%s%5d  %s", DARK_GRAY, filerow + 1, RESET_FG);
-            writeBufAppend(wb, gutter, glen);
+            drawLineNums(wb, filerow);
+
             int len = E.buffer.rows[filerow].rsize - E.viewport.col_off;
             if (len < 0) len = 0;
             if (len > E.viewport.width) len = E.viewport.width;
+
             char          *c          = &E.buffer.rows[filerow].render[E.viewport.col_off];
             unsigned char *hl         = &E.buffer.rows[filerow].hl[E.viewport.col_off];
             char          *curr_color = NULL;
             int            j;
+
             for (j = 0; j < len; j++) {
                 if (iscntrl(c[j])) {
                     char sym = (c[j] <= 26) ? '@' + c[j] : '?';
                     writeBufAppend(wb, "\x1b[7m", 4);
                     writeBufAppend(wb, &sym, 1);
                     writeBufAppend(wb, "\x1b[m", 3);
+
                     if (curr_color != NULL) { writeBufAppend(wb, curr_color, strlen(curr_color)); }
+
                 } else if (hl[j] == HL_NORMAL) {
                     if (curr_color != NULL) {
                         writeBufAppend(wb, DEF_COLOR, 5);
@@ -75,6 +77,7 @@ void drawRows(WriteBuf *wb) {
                         curr_color = color;
                         writeBufAppend(wb, color, strlen(color));
                     }
+
                     writeBufAppend(wb, &c[j], 1);
                 }
             }
@@ -84,6 +87,18 @@ void drawRows(WriteBuf *wb) {
         writeBufAppend(wb, "\x1b[K", 3);
         writeBufAppend(wb, "\r\n", 2);
     }
+}
+
+void drawLineNums(WriteBuf *wb, int filerow) {
+    char gutter[24];
+    int  glen;
+    /* highlight current line num for cursor */
+    if (E.cursor.y == filerow) {
+        glen = snprintf(gutter, sizeof(gutter), "%5d  ", filerow + 1);
+    } else {
+        glen = snprintf(gutter, sizeof(gutter), "%s%5d  %s", DARK_GRAY, filerow + 1, RESET_FG);
+    }
+    writeBufAppend(wb, gutter, glen);
 }
 
 void welcomeScreen(WriteBuf *wb) {
@@ -268,16 +283,25 @@ void editorOpen(char *filename) {
     E.buffer.dirty = false;
 }
 
+/* y = 0: top of file  */
 void editorScroll() {
+    /* obtain cursor column */
     E.cursor.rx = 0;
     if (E.cursor.y < E.buffer.num_rows) {
         E.cursor.rx = editorRowXtoRx(&E.buffer.rows[E.cursor.y], E.cursor.x);
     }
 
-    if (E.cursor.y < E.viewport.row_off) { E.viewport.row_off = E.cursor.y; }
-    if (E.cursor.y >= E.viewport.row_off + E.viewport.height) {
-        E.viewport.row_off = E.cursor.y - E.viewport.height + 1;
+    /* scrolloff for approaching top of file */
+    if (E.cursor.y < E.viewport.row_off + SCROLL_OFF) {
+        E.viewport.row_off = E.cursor.y - SCROLL_OFF;
+        if (E.viewport.row_off < 0) E.viewport.row_off = 0;
     }
+
+    /* scrolloff for approaching bottom of file */
+    if (E.cursor.y >= E.viewport.row_off + E.viewport.height - SCROLL_OFF) {
+        E.viewport.row_off = E.cursor.y - E.viewport.height + 1 + SCROLL_OFF;
+    }
+
     if (E.cursor.rx < E.viewport.col_off) { E.viewport.col_off = E.cursor.rx; }
     if (E.cursor.rx >= E.viewport.col_off + E.viewport.width) {
         E.viewport.col_off = E.cursor.rx - E.viewport.width + 1;
