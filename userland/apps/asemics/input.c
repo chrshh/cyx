@@ -59,11 +59,16 @@ void handleNormalModeKey(int c) {
         editorQuit(false);
         break;
 
+        /* special actions */
     case CTRL_KEY('s'): editorSave(); break;
 
     case LEADER: handleLeaderKey(); break;
 
-    case '/': editorFind(); break;
+    case '/':
+        editorFind();
+        break;
+
+        /* ***** motion keys only ***** */
 
     case 'o': {
         Pos target = actionInsertLineBelowCursor();
@@ -96,32 +101,6 @@ void handleNormalModeKey(int c) {
         default: break;
         }
     }
-
-    case '$': {
-        Pos target = motionLineLastChar();
-        E.cursor.x = target.x;
-        E.cursor.y = target.y;
-        break;
-        Row *row = (E.cursor.y >= E.buffer.num_rows) ? NULL : &E.buffer.rows[E.cursor.y];
-        if (row && row->size > 0) { E.cursor.x = strlen(row->chars) - 1; }
-    } break;
-
-    case '^': E.cursor.x = 0; break;
-
-    case 'i': E.mode = MODE_INSERT; break;
-
-    case 'a':
-        E.mode = MODE_INSERT;
-        E.cursor.x++;
-        break;
-
-    case ':':
-        E.mode          = MODE_COMMAND;
-        E.ui.cmdline[0] = ':';
-        E.ui.cmdline[1] = '\0';
-        break;
-
-    case 'v': E.mode = MODE_VISUAL; break;
 
     case 'w': {
         Pos target = motionWordForward();
@@ -173,6 +152,37 @@ void handleNormalModeKey(int c) {
     case ARROW_DOWN:
     case ARROW_LEFT:
     case ARROW_RIGHT: moveCursor(c); break;
+
+    case '$': {
+        Pos target = motionLineLastChar();
+        E.cursor.x = target.x;
+        E.cursor.y = target.y;
+        break;
+        Row *row = (E.cursor.y >= E.buffer.num_rows) ? NULL : &E.buffer.rows[E.cursor.y];
+        if (row && row->size > 0) { E.cursor.x = strlen(row->chars) - 1; }
+    } break;
+
+    case '^': E.cursor.x = 0; break;
+
+    /* enter insert mode */
+    case 'i':
+        historyCheckpoint();
+        E.mode = MODE_INSERT;
+        break;
+
+    case 'a':
+        historyCheckpoint();
+        E.mode = MODE_INSERT;
+        E.cursor.x++;
+        break;
+
+    case ':':
+        E.mode          = MODE_COMMAND;
+        E.ui.cmdline[0] = ':';
+        E.ui.cmdline[1] = '\0';
+        break;
+
+    case 'v': E.mode = MODE_VISUAL; break;
     }
 }
 

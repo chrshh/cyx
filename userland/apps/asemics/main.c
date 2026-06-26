@@ -1,23 +1,29 @@
 #include <unistd.h>
 #include <termios.h>
-
 #include "asemics.h"
 
-Editor E;
+Editor  E;
+History H;
+FILE   *dbg;
 
 int main(int argc, char **argv) {
-  enableRawMode();
-  initEditor(&E);
-  if (argc >= 2) {
-    editorOpen(argv[1]);
-  }
+    enableRawMode();
 
-  // editorSetStatusMsg(":q -> QUIT\t :w -> SAVE");
+    /*
+     * read debug logs
+     * "tail -f /tmp/asemics.log"
+     */
+    initDbg();
 
-  while (1) {
-    refreshScreen();
-    processKey();
-  }
+    initEditor(&E, &H);
+    if (argc >= 2) { editorOpen(argv[1]); }
 
-  return 0;
+    // editorSetStatusMsg(":q -> QUIT\t :w -> SAVE");
+
+    while (1) {
+        refreshScreen();
+        processKey();
+    }
+
+    return 0;
 }

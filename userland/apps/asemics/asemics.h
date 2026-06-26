@@ -2,6 +2,7 @@
 #define ASEMICS_H
 
 #include <stddef.h>
+#include <stdio.h>
 #include <termios.h>
 #include <time.h>
 #include <stdbool.h>
@@ -111,13 +112,26 @@ typedef struct {
     char   cmdline[80]; /* text being typed in command mode (`:w`, `:q`, ...) */
 } StatusBar;
 
+typedef struct HistoryItem {
+    Cursor cursor;
+    Row    row;
+} HistoryItem;
+
+typedef struct History {
+    HistoryItem *records;
+    unsigned int capacity;
+    unsigned int length;
+    unsigned int curr_idx;
+} History;
+
 typedef struct Editor {
-    EditorMode     mode;      /* current modal state (normal/insert/command/visual) */
-    Cursor         cursor;    /* where the cursor is */
-    Viewport       viewport;  /* what slice of the buffer is visible */
-    Buffer         buffer;    /* the document being edited */
-    StatusBar      ui;        /* bottom-bar state: status message + command line */
-    EditorSyntax  *syntax;    /* active syntax-highlight rules (NULL = none) */
+    EditorMode     mode;     /* current modal state (normal/insert/command/visual) */
+    Cursor         cursor;   /* where the cursor is */
+    Viewport       viewport; /* what slice of the buffer is visible */
+    Buffer         buffer;   /* the document being edited */
+    StatusBar      ui;       /* bottom-bar state: status message + command line */
+    EditorSyntax  *syntax;   /* active syntax-highlight rules (NULL = none) */
+    History       *history;
     struct termios orig_term; /* termios snapshot from before raw mode, restored on exit */
 } Editor;
 
@@ -133,7 +147,9 @@ typedef struct {
     int y;
 } Pos;
 
-extern Editor E;
+extern Editor  E;
+extern History H;
+extern FILE   *dbg;
 
 /* terminal.c */
 void die(const char *s);
@@ -155,7 +171,7 @@ void handleLeaderKey(void);
 void     refreshScreen(void);
 void     clearScreen(void);
 void     drawRows(WriteBuf *wb);
-void     initEditor(Editor *e);
+void     initEditor(Editor *e, History *h);
 WriteBuf writeBufInit(void);
 void     writeBufFree(WriteBuf *wb);
 void     writeBufAppend(WriteBuf *wb, const char *s, int len);
@@ -205,6 +221,14 @@ int   is_separator(int c);
 int   is_operator(int c);
 void  editorSetSyntaxHighlight(void);
 
+/* history.c */
+History *initHistory();
+void     historyCheckpoint();
+void     historyUndo();
+void     historyRedo();
+Row      deepCopyRow(Row *og_row);
+Cursor   deepCopyCursor(Cursor *og_cursor);
+
 /*
  *
  * motionfns.c
@@ -229,6 +253,11 @@ Pos actionInsertLineAboveCursor(void);
 /* search.c */
 void editorFind(void);
 void editorFindCallback(char *query, int key);
+
+/* dbg.c */
+void initDbg();
+void addDbgLog(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+;
 
 enum editorKey { BACKSPACE = 127, ARROW_LEFT = 1000, ARROW_RIGHT, ARROW_UP, ARROW_DOWN };
 

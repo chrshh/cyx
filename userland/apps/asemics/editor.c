@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include "asemics.h"
 
-void initEditor(Editor *e) {
+void initEditor(Editor *e, History *h) {
     e->mode             = MODE_NORMAL;
     e->cursor.x         = 0;
     e->cursor.y         = 0;
@@ -25,6 +25,10 @@ void initEditor(Editor *e) {
     if (getWindowSize(&e->viewport.height, &e->viewport.width) == -1) die("getWindowSize");
     e->viewport.height -= STATUS_BAR_RESERVE; // status bar space for bottom of screen
     e->viewport.width -= LINE_NUM_RESERVE;
+
+    /* construct history that will live on the global editor state */
+    e->history = initHistory();
+    h          = e->history;
 }
 
 void repositionCursorTL(WriteBuf *wb) {
@@ -120,6 +124,8 @@ void welcomeScreen(WriteBuf *wb) {
     int desc_padding1 = (E.viewport.width - desclen1) / 2;
     int desc_padding2 = (E.viewport.width - desclen2) / 2;
 
+    writeBufAppend(wb, CURSOR_HIDE, strlen(CURSOR_HIDE));
+
     if (title_padding) {
         writeBufAppend(wb, "~", 1);
         title_padding--;
@@ -184,9 +190,14 @@ void refreshScreen(void) {
                  (E.cursor.rx - E.viewport.col_off) + LINE_NUM_RESERVE); // consumes 8 visual cols
     writeBufAppend(&wb, buf, n);
 
-    /* Enabled cursor and render cursor based on EDITOR MODE */
-    writeBufAppend(&wb, CURSOR_SHOW, 6);
-    updateCursorShape(&wb);
+    /* Enabled cursor and render cursor based on EDITOR MODE && if a file is open */
+    if (E.buffer.filename != NULL) {
+        writeBufAppend(&wb, CURSOR_SHOW, 6);
+        updateCursorShape(&wb);
+    } else {
+        writeBufAppend(&wb, CURSOR_HIDE, strlen(CURSOR_HIDE));
+    }
+
     write(STDOUT_FILENO, wb.data, wb.len);
     writeBufFree(&wb);
 }
