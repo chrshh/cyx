@@ -9,7 +9,9 @@ use ratatui::{
 };
 
 use crate::{
-    components::{CmdLine, DirList, Picker, Preview, Statbar, cmdline::Mode},
+    components::{
+        CmdLine, DirList, Picker, Preview, Statbar, cmdline::Mode, picker::handle_picker_key,
+    },
     parse::RunConfig,
 };
 
@@ -28,6 +30,7 @@ pub struct App {
     pub picker: Option<Picker>,
     pub picked: Option<PathBuf>,
     pub picker_mode: bool,
+    pub picker_state: u32,
 }
 
 impl App {
@@ -41,7 +44,7 @@ impl App {
             None => DirList::empty(),
         };
 
-        let show_hidden = false;
+        let show_hidden = true;
         let current = DirList::new(&cwd);
         let preview = Preview::from(&cwd, &current);
         let statbar = Statbar::new(&cwd);
@@ -49,6 +52,7 @@ impl App {
         let picker = None;
         let picked = None;
         let picker_mode = false;
+        let picker_state = 0;
 
         Self {
             cwd,
@@ -61,6 +65,7 @@ impl App {
             picker,
             picked,
             picker_mode,
+            picker_state,
         }
     }
 
@@ -71,7 +76,7 @@ impl App {
             args.provided_dir
         };
 
-        let show_hidden = false;
+        let show_hidden = true;
         let parent = DirList::empty();
         let current = DirList::new(&cwd);
         let preview = Preview::from(&cwd, &current);
@@ -81,6 +86,7 @@ impl App {
         let picker = Picker::new();
         let picked = None;
         let picker_mode = true;
+        let picker_state = 0;
 
         Self {
             cwd,
@@ -93,6 +99,7 @@ impl App {
             picker: Some(picker),
             picked,
             picker_mode,
+            picker_state,
         }
     }
 
@@ -144,7 +151,7 @@ impl App {
         let picker_area = self
             .picker
             .unwrap()
-            .render_picker_area(50, 25, frame.area());
+            .render_picker_area(50, 30, frame.area());
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -173,6 +180,9 @@ impl App {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> bool {
+        if self.picker_mode {
+            return handle_picker_key(key, self);
+        }
         /* intercept keystrokes if cmdline is open */
         if self.cmdline.mode.is_some() {
             return self.handle_cmdline_key(key);
@@ -225,25 +235,25 @@ impl App {
         false
     }
 
-    fn move_down(&mut self) {
+    pub fn move_down(&mut self) {
         DirList::cursor_down(&mut self.current);
         self.refresh_preview();
     }
 
-    fn move_up(&mut self) {
+    pub fn move_up(&mut self) {
         DirList::cursor_up(&mut self.current);
         self.refresh_preview();
     }
 
-    fn jump_top(&mut self) {
+    pub fn jump_top(&mut self) {
         DirList::cursor_top(&mut self.current);
     }
 
-    fn jump_bottom(&mut self) {
+    pub fn jump_bottom(&mut self) {
         DirList::cursor_bottom(&mut self.current);
     }
 
-    fn enter_selected(&mut self) {
+    pub fn enter_selected(&mut self) {
         if let Some(entry) = self.current.selected_entry() {
             let new_cwd = self.cwd.join(entry);
             if new_cwd.is_dir() {
@@ -253,27 +263,27 @@ impl App {
         }
     }
 
-    fn go_up(&mut self) {
+    pub fn go_up(&mut self) {
         if let Some(parent) = self.cwd.parent() {
             self.cwd = parent.to_path_buf();
             self.refresh_all();
         }
     }
 
-    fn toggle_hidden(&mut self) {
+    pub fn toggle_hidden(&mut self) {
         self.show_hidden = !self.show_hidden;
         self.refresh_all();
     }
 
-    fn refresh_preview(&mut self) {
+    pub fn refresh_preview(&mut self) {
         self.preview = Preview::from(&self.cwd, &self.current);
     }
 
-    fn refresh_statbar(&mut self) {
+    pub fn refresh_statbar(&mut self) {
         self.statbar = Statbar::from(&self.cwd, &self.cmdline);
     }
 
-    fn refresh_all(&mut self) {
+    pub fn refresh_all(&mut self) {
         /* rebuild based on cwd */
         self.parent = match self.cwd.parent() {
             Some(p) => {
@@ -287,10 +297,15 @@ impl App {
         self.statbar = Statbar::new(&self.cwd);
     }
 
-    fn search(&mut self) {
+    pub fn search(&mut self) {
         self.current = DirList::from_search(self.cmdline.search(&self.cwd));
         self.refresh_statbar();
         self.cmdline.close();
+        self.refresh_preview();
+    }
+
+    pub fn picker_search(&mut self) {
+        self.current = DirList::from_search(self.cmdline.search(&self.cwd));
         self.refresh_preview();
     }
 }

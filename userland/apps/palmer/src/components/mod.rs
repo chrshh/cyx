@@ -1,6 +1,6 @@
 pub mod cmdline;
 mod dir_list;
-mod picker;
+pub mod picker;
 mod preview;
 mod statbar;
 

@@ -64,9 +64,9 @@ fn run() -> std::io::Result<Option<String>> {
     }
 
     if !app.picker_mode {
-        execute!(tty_ctrl, LeaveAlternateScreen)?;
+        let _ = execute!(tty_ctrl, LeaveAlternateScreen);
     }
-    disable_raw_mode()?;
+    let _ = disable_raw_mode();
 
     Ok(app.picked_file())
 }
