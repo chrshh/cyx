@@ -30,6 +30,12 @@ impl Statbar {
         Self { content }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            content: String::new(),
+        }
+    }
+
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default().padding(Padding::horizontal(1));
         let inner = block.inner(area);

@@ -37,6 +37,17 @@ impl CmdLine {
         frame.render_widget(p, area);
     }
 
+    /* picker-mode variant */
+    pub fn render_picker(&self, frame: &mut Frame, area: Rect) {
+        let content = format!("{}: {}", self.get_search_text(), self.input);
+        let p = Paragraph::new(content).block(
+            Block::default()
+                .borders(Borders::BOTTOM)
+                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::White)),
+        );
+        frame.render_widget(p, area);
+    }
+
     pub fn open(&mut self, mode: Mode) {
         self.mode = Some(mode);
         self.input.clear();

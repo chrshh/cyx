@@ -4,10 +4,14 @@ use ratatui::{
     Frame,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
     layout::{Constraint, Direction, Layout},
-    widgets::Clear,
+    style::{Color, Style},
+    widgets::{Block, Borders, Clear},
 };
 
-use crate::components::{CmdLine, DirList, Preview, Statbar, cmdline::Mode};
+use crate::{
+    components::{CmdLine, DirList, Picker, Preview, Statbar, cmdline::Mode},
+    parse::RunConfig,
+};
 
 #[derive(Debug)]
 pub struct App {
@@ -20,6 +24,10 @@ pub struct App {
     pub preview: Preview,
     pub statbar: Statbar,
     pub cmdline: CmdLine,
+    /* plugin fields */
+    pub picker: Option<Picker>,
+    pub picked: Option<PathBuf>,
+    pub picker_mode: bool,
 }
 
 impl App {
@@ -38,6 +46,9 @@ impl App {
         let preview = Preview::from(&cwd, &current);
         let statbar = Statbar::new(&cwd);
         let cmdline = CmdLine::init();
+        let picker = None;
+        let picked = None;
+        let picker_mode = false;
 
         Self {
             cwd,
@@ -47,37 +58,118 @@ impl App {
             preview,
             statbar,
             cmdline,
+            picker,
+            picked,
+            picker_mode,
         }
     }
 
+    pub fn picker_mode(args: RunConfig) -> Self {
+        let cwd = if args.provided_dir.to_str().unwrap().is_empty() {
+            std::env::current_dir().unwrap_or_default()
+        } else {
+            args.provided_dir
+        };
+
+        let show_hidden = false;
+        let parent = DirList::empty();
+        let current = DirList::new(&cwd);
+        let preview = Preview::from(&cwd, &current);
+        let statbar = Statbar::empty();
+        let mut cmdline = CmdLine::init();
+        cmdline.mode = Some(Mode::Find);
+        let picker = Picker::new();
+        let picked = None;
+        let picker_mode = true;
+
+        Self {
+            cwd,
+            show_hidden,
+            current,
+            parent,
+            preview,
+            statbar,
+            cmdline,
+            picker: Some(picker),
+            picked,
+            picker_mode,
+        }
+    }
+
+    /*
+     * getter method only accessed when pressing
+     * ENTER to return file path name
+     * */
+    pub fn picked_file(&self) -> Option<String> {
+        self.picked
+            .as_ref()
+            .map(|p| p.to_string_lossy().into_owned())
+    }
+
     pub fn render(&mut self, frame: &mut Frame) {
+        if self.picker_mode {
+            self.render_picker_mode(frame)
+        } else {
+            let vertical = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(1), Constraint::Min(1)])
+                .split(frame.area());
+
+            let statbar_area = vertical[0];
+            let main_area = vertical[1];
+
+            let columns = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(40),
+                ])
+                .split(main_area);
+
+            self.statbar.render(frame, statbar_area);
+            self.parent.render(frame, columns[0], self.show_hidden);
+            self.current.render(frame, columns[1], self.show_hidden);
+            self.preview.render(frame, columns[2], self.show_hidden);
+
+            if self.cmdline.is_open() {
+                let area = self.cmdline.render_cmdline_area(60, 3, frame.area());
+                frame.render_widget(Clear, area);
+                self.cmdline.render(frame, area);
+            }
+        }
+    }
+
+    pub fn render_picker_mode(&mut self, frame: &mut Frame) {
+        let picker_area = self
+            .picker
+            .unwrap()
+            .render_picker_area(50, 25, frame.area());
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::White));
+
+        frame.render_widget(Clear, picker_area);
+        frame.render_widget(block.clone(), picker_area);
+        let inner = block.inner(picker_area);
+
         let vertical = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Min(1)])
-            .split(frame.area());
+            .constraints([Constraint::Length(2), Constraint::Min(1)])
+            .split(inner);
 
-        let statbar_area = vertical[0];
+        let cmdline_area = vertical[0];
         let main_area = vertical[1];
 
         let columns = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Percentage(20),
-                Constraint::Percentage(40),
-                Constraint::Percentage(40),
-            ])
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(main_area);
 
-        self.statbar.render(frame, statbar_area);
-        self.parent.render(frame, columns[0], self.show_hidden);
-        self.current.render(frame, columns[1], self.show_hidden);
-        self.preview.render(frame, columns[2], self.show_hidden);
-
-        if self.cmdline.is_open() {
-            let area = self.cmdline.render_cmdline_area(60, 3, frame.area());
-            frame.render_widget(Clear, area);
-            self.cmdline.render(frame, area);
-        }
+        self.cmdline.render_picker(frame, cmdline_area);
+        self.current.render(frame, columns[0], self.show_hidden);
+        self.preview.render(frame, columns[1], self.show_hidden);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> bool {

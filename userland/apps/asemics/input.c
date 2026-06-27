@@ -61,8 +61,12 @@ void handleNormalModeKey(int c) {
 
         /* special actions */
     case CTRL_KEY('s'): editorSave(); break;
-    case LEADER: handleLeaderKey(); break;
     case '/': editorFind(); break;
+
+    case LEADER: {
+        handleLeaderKey();
+        break;
+    }
 
     case 'u': {
         historyUndo();
@@ -216,7 +220,11 @@ void handleCommandModeKey(int c) {
 }
 
 void handleVisualModeKey(int c) {
-    (void)c;
+    switch (c) {
+    case '\x1b': {
+        E.mode = MODE_NORMAL;
+    }
+    }
     return;
 }
 
@@ -245,19 +253,21 @@ void handleInsertModeKey(int c) {
     return;
 }
 
-void handleLeaderKey(void) {
+void handleLeaderKey() {
+    int c = readKey();
+
+    switch (c) {
+    /* <leader>f? */
+    case 'f': {
+        int f = readKey();
+        switch (f) {
+        case 'f': {
+            invokePalmer(NULL);
+            break;
+        }
+        case 'F': invokePalmer(getenv("HOME")); break;
+        }
+    }
+    }
     return;
 }
-//   int c = readKey();
-//
-//   switch (c) {
-//   case '\x1b':
-//     return;
-//
-//   case 'g':
-//     int d = readKey();
-//     switch (d) {
-//         case 'g'
-//       }
-//   }
-// }

@@ -11,7 +11,7 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define ENTER       '\r'
 
-#define LEADER ' '
+#define LEADER 32
 
 /* cursor & screen */
 #define CURSOR_TL    "\x1b[H"
@@ -30,6 +30,8 @@
 #define LINE_NUM_RESERVE   8
 
 #define SCROLL_OFF 5
+
+#define PALMER_MAX_PATH 4096
 
 /* commands */
 #define SAVE  (1 << 0)
@@ -153,6 +155,7 @@ extern FILE   *dbg;
 
 /* terminal.c */
 void die(const char *s);
+void childExit(void);
 void disableRawMode(void);
 void enableRawMode(void);
 int  getWindowSize(int *rows, int *cols);
@@ -259,6 +262,9 @@ void editorFindCallback(char *query, int key);
 void initDbg();
 void addDbgLog(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 ;
+
+/* palmer.c */
+int invokePalmer(const char *start_dir);
 
 enum editorKey { BACKSPACE = 127, ARROW_LEFT = 1000, ARROW_RIGHT, ARROW_UP, ARROW_DOWN };
 
