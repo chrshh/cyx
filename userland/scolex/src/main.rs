@@ -48,7 +48,9 @@ fn run_prompt() {
         io::stdout().flush().unwrap();
 
         let mut line = String::new();
-        io::stdin().read_line(&mut line).unwrap();
+        io::stdin()
+            .read_line(&mut line)
+            .expect("failed to read line");
         if line.is_empty() || line == "exit" {
             break;
         }
@@ -60,8 +62,7 @@ fn run_prompt() {
 
 /* entry point for running a scolex source file */
 fn run(source: &str) {
-    let scanner = Scanner::new(source);
-
-    let tokens: Vec<Token> = scanner.collect();
-    let _ = tokens.into_iter().map(|t| print!("{:?}", t));
+    let mut scanner = Scanner::new(source);
+    let tokens: Vec<Token> = scanner.scan_tokens();
+    let _ = tokens.iter().map(|f| print!("{:?} ", f.to_string()));
 }

@@ -1,19 +1,20 @@
 use crate::token_type::TokenType;
 
-#[derive(Debug, PartialEq, Clone)]
+pub struct Tokens<L>(pub Vec<GenericToken<L>>);
+
+#[derive(Debug, PartialEq, Clone, Default)]
 pub enum Literal {
     String(String),
     Number(f64),
-    Bool(bool),
-    Null,
+    #[default]
+    Null, // null is reserved for identifiers / keywords
 }
 
 impl Literal {
-    pub fn type_name(literal: Literal) -> &'static str {
-        match literal {
+    pub fn type_name(&self) -> &'static str {
+        match self {
             Self::String(_) => "STRING",
             Self::Number(_) => "NUMBER",
-            Self::Bool(_) => "BOOL",
             Self::Null => "NULL",
         }
     }
@@ -22,8 +23,11 @@ impl Literal {
 /* free to_string() for debugging */
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let s = self;
-        write!(f, "{}", s)
+        match self {
+            Literal::String(s) => write!(f, "{s}"),
+            Literal::Number(n) => write!(f, "{n}"),
+            Literal::Null => write!(f, "null"),
+        }
     }
 }
 
@@ -33,6 +37,15 @@ pub struct GenericToken<L> {
     pub lexeme: String,
     pub literal: Option<L>,
     pub line: usize,
+}
+
+impl<L: std::fmt::Display> std::fmt::Display for GenericToken<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match &self.literal {
+            Some(lit) => write!(f, "{:?} {} {}", self.token_type, self.lexeme, lit),
+            None => write!(f, "{:?} {} null", self.token_type, self.lexeme),
+        }
+    }
 }
 
 /* token creation from params */
@@ -45,14 +58,12 @@ impl<L> GenericToken<L> {
             line,
         }
     }
-
-    pub fn to_string(&self) -> String
-    where
-        L: std::fmt::Display + Clone + Clone + Copy,
-    {
-        self.token_type.to_string()
-            + self.lexeme.as_str()
-            + self.literal.unwrap().to_string().as_str()
-            + self.line.to_string().as_str()
+}
+impl<L: std::fmt::Display> std::fmt::Display for Tokens<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for tok in &self.0 {
+            writeln!(f, "{tok}")?;
+        }
+        Ok(())
     }
 }
