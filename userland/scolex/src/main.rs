@@ -1,6 +1,8 @@
+#![feature(variant_count)]
 use std::{
     fs::read_to_string,
     io::{self, Write},
+    mem,
     process::exit,
 };
 
@@ -10,7 +12,10 @@ use crate::{
     token::{GenericToken, Literal},
 };
 
+mod ast;
+mod ast_printer;
 mod error;
+mod parser;
 mod scanner;
 mod token;
 mod token_type;

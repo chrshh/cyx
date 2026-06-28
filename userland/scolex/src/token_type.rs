@@ -1,4 +1,6 @@
-#[derive(Debug, PartialEq, Clone, Copy)]
+use strum::EnumIter;
+
+#[derive(Debug, PartialEq, Clone, Copy, EnumIter)]
 pub enum TokenType {
     /* single char tokens */
     LeftParen,

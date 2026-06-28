@@ -3,7 +3,7 @@
 # Options marked NIGHTLY require `cargo +nightly fmt`.
 
 # ---- stable ----
-max_width = 100                  # line-length budget everything wraps to
+max_width = 70                   # line-length budget everything wraps to
 use_small_heuristics = "Default" # how eagerly to keep short constructs on one line
 reorder_imports = true           # sort `use` statements
 reorder_modules = true           # sort `mod` declarations
@@ -11,12 +11,12 @@ newline_style = "Unix"
 edition = "2024"
 
 # ---- NIGHTLY only (run: cargo +nightly fmt) ----
-style_edition = "2024"           # use the latest formatting ruleset
-wrap_comments = true             # reflow long comments to comment_width
+style_edition = "2024"             # use the latest formatting ruleset
+wrap_comments = true               # reflow long comments to comment_width
 comment_width = 80
-format_strings = true            # wrap long string literals
+format_strings = true              # wrap long string literals
 format_code_in_doc_comments = true
-imports_granularity = "Crate"    # merge `use` trees per-crate (use crate::{a, b};)
+imports_granularity = "Crate"      # merge `use` trees per-crate (use crate::{a, b};)
 group_imports = "StdExternalCrate" # std / extern / crate blocks, separated
-fn_params_layout = "Tall"        # one param per line when a signature wraps
-chain_width = 60                 # break method chains past this width
+fn_params_layout = "Tall"          # one param per line when a signature wraps
+chain_width = 60                   # break method chains past this width

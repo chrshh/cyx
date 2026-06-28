@@ -6,6 +6,7 @@ pub struct Tokens<L>(pub Vec<GenericToken<L>>);
 pub enum Literal {
     String(String),
     Number(f64),
+    Bool(bool),
     #[default]
     Null, // null is reserved for identifiers / keywords
 }
@@ -15,6 +16,7 @@ impl Literal {
         match self {
             Self::String(_) => "STRING",
             Self::Number(_) => "NUMBER",
+            Self::Bool(_) => "BOOL",
             Self::Null => "NULL",
         }
     }
@@ -26,6 +28,7 @@ impl std::fmt::Display for Literal {
         match self {
             Literal::String(s) => write!(f, "{s}"),
             Literal::Number(n) => write!(f, "{n}"),
+            Literal::Bool(b) => write!(f, "{b}"),
             Literal::Null => write!(f, "null"),
         }
     }
