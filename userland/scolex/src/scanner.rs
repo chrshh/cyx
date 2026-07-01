@@ -41,6 +41,8 @@ impl<'a> Scanner<'a> {
             self.scan_token();
         });
 
+        self.add_token_from_token_type(TokenType::Eof);
+
         println!("{}", Tokens(self.tokens.clone()));
         self.tokens.clone()
     }
@@ -50,58 +52,91 @@ impl<'a> Scanner<'a> {
         if let Some(c) = c {
             match c {
                 /* single char tokens */
-                '(' => self.add_token_from_token_type(TokenType::LeftParen),
-                ')' => self.add_token_from_token_type(TokenType::RightParen),
-                '{' => self.add_token_from_token_type(TokenType::LeftBrace),
-                '}' => self.add_token_from_token_type(TokenType::RightBrace),
-                ',' => self.add_token_from_token_type(TokenType::Comma),
+                '(' => self
+                    .add_token_from_token_type(TokenType::LeftParen),
+                ')' => self
+                    .add_token_from_token_type(TokenType::RightParen),
+                '{' => self
+                    .add_token_from_token_type(TokenType::LeftBrace),
+                '}' => self
+                    .add_token_from_token_type(TokenType::RightBrace),
+                ',' => {
+                    self.add_token_from_token_type(TokenType::Comma)
+                }
                 '.' => self.add_token_from_token_type(TokenType::Dot),
-                '-' => self.add_token_from_token_type(TokenType::Minus),
-                '+' => self.add_token_from_token_type(TokenType::Plus),
-                ';' => self.add_token_from_token_type(TokenType::Semicolon),
-                '*' => self.add_token_from_token_type(TokenType::Star),
+                '-' => {
+                    self.add_token_from_token_type(TokenType::Minus)
+                }
+                '+' => {
+                    self.add_token_from_token_type(TokenType::Plus)
+                }
+                ';' => self
+                    .add_token_from_token_type(TokenType::Semicolon),
+                '*' => {
+                    self.add_token_from_token_type(TokenType::Star)
+                }
 
                 /* one or two char tokens */
                 '!' => {
                     if self.token_match('=') {
-                        self.add_token_from_token_type(TokenType::BangEqual);
+                        self.add_token_from_token_type(
+                            TokenType::BangEqual,
+                        );
                     } else {
-                        self.add_token_from_token_type(TokenType::Bang);
+                        self.add_token_from_token_type(
+                            TokenType::Bang,
+                        );
                     }
                 }
 
                 '=' => {
                     if self.token_match('=') {
-                        self.add_token_from_token_type(TokenType::EqualEqual);
+                        self.add_token_from_token_type(
+                            TokenType::EqualEqual,
+                        );
                     } else {
-                        self.add_token_from_token_type(TokenType::Equal);
+                        self.add_token_from_token_type(
+                            TokenType::Equal,
+                        );
                     }
                 }
 
                 '<' => {
                     if self.token_match('=') {
-                        self.add_token_from_token_type(TokenType::LessEqual);
+                        self.add_token_from_token_type(
+                            TokenType::LessEqual,
+                        );
                     } else {
-                        self.add_token_from_token_type(TokenType::Less);
+                        self.add_token_from_token_type(
+                            TokenType::Less,
+                        );
                     }
                 }
 
                 '>' => {
                     if self.token_match('=') {
-                        self.add_token_from_token_type(TokenType::GreaterEqual);
+                        self.add_token_from_token_type(
+                            TokenType::GreaterEqual,
+                        );
                     } else {
-                        self.add_token_from_token_type(TokenType::Greater);
+                        self.add_token_from_token_type(
+                            TokenType::Greater,
+                        );
                     }
                 }
 
                 '/' => {
                     if self.token_match('/') {
                         /* skip comments until the end of the line */
-                        while self.peek() != Some('\n') && !self.is_at_end() {
+                        while self.peek() != Some('\n')
+                            && !self.is_at_end()
+                        {
                             self.advance();
                         }
                     } else {
-                        self.add_token_from_token_type(TokenType::Slash);
+                        self.add_token_from_token_type(
+                            TokenType::Slash,
+                        );
                     }
                 }
 
@@ -122,7 +157,10 @@ impl<'a> Scanner<'a> {
 
                     /* unrecognized */
                     } else {
-                        Scolex::error(self.line, "unexpected character.");
+                        Scolex::error(
+                            self.line,
+                            "unexpected character.",
+                        );
                     }
                 }
             }
@@ -133,9 +171,16 @@ impl<'a> Scanner<'a> {
         self.add_token_from_token_type_and_literal(t, None);
     }
 
-    pub fn add_token_from_token_type_and_literal(&mut self, t: TokenType, l: Option<L>) {
-        let text: String = self.source.to_string()[self.start..self.current].to_string();
-        let token = Token::from(t, text, l.unwrap_or_default(), self.line);
+    pub fn add_token_from_token_type_and_literal(
+        &mut self,
+        t: TokenType,
+        l: Option<L>,
+    ) {
+        let text: String = self.source.to_string()
+            [self.start..self.current]
+            .to_string();
+        let token =
+            Token::from(t, text, l.unwrap_or_default(), self.line);
         self.add(token);
     }
 
@@ -230,7 +275,9 @@ impl<'a> Scanner<'a> {
         /* the closing " */
         self.advance();
 
-        let s: String = self.source.to_string()[self.start + 1..self.current - 1].to_string();
+        let s: String = self.source.to_string()
+            [self.start + 1..self.current - 1]
+            .to_string();
         self.add_str_token(TokenType::String, s);
     }
 
@@ -239,7 +286,10 @@ impl<'a> Scanner<'a> {
             self.advance();
         }
 
-        if self.peek().is_some() && self.peek().unwrap() == '.' && is_digit(self.peek_next()) {
+        if self.peek().is_some()
+            && self.peek().unwrap() == '.'
+            && is_digit(self.peek_next())
+        {
             self.advance();
 
             while self.peek().is_some() {
@@ -249,7 +299,9 @@ impl<'a> Scanner<'a> {
             }
         }
 
-        let num: String = self.source.to_string()[self.start..self.current].to_string();
+        let num: String = self.source.to_string()
+            [self.start..self.current]
+            .to_string();
         self.add_num_token(TokenType::Number, num);
     }
 
@@ -259,7 +311,8 @@ impl<'a> Scanner<'a> {
         }
 
         let s: &str = &self.source[self.start..self.current];
-        let mut token_type: Option<TokenType> = KEYWORDS.get(s).cloned();
+        let mut token_type: Option<TokenType> =
+            KEYWORDS.get(s).cloned();
         match token_type.is_none() {
             true => {
                 token_type = Some(TokenType::Identifier);
@@ -289,24 +342,25 @@ fn is_alpha(c: Option<char>) -> bool {
     c.is_some() && c.unwrap().is_alphanumeric()
 }
 
-static KEYWORDS: LazyLock<HashMap<&'static str, TokenType>> = LazyLock::new(|| {
-    HashMap::from([
-        ("and", TokenType::And),
-        ("class", TokenType::Class),
-        ("else", TokenType::Else),
-        ("false", TokenType::False),
-        ("fun", TokenType::Fun),
-        ("for", TokenType::For),
-        ("if", TokenType::If),
-        ("NULL", TokenType::Null),
-        ("or", TokenType::Or),
-        ("print", TokenType::Print),
-        ("return", TokenType::Return),
-        ("super", TokenType::Super),
-        ("this", TokenType::This),
-        ("true", TokenType::True),
-        ("var", TokenType::Var),
-        ("for", TokenType::For),
-        ("while", TokenType::While),
-    ])
-});
+static KEYWORDS: LazyLock<HashMap<&'static str, TokenType>> =
+    LazyLock::new(|| {
+        HashMap::from([
+            ("and", TokenType::And),
+            ("class", TokenType::Class),
+            ("else", TokenType::Else),
+            ("false", TokenType::False),
+            ("fun", TokenType::Fun),
+            ("for", TokenType::For),
+            ("if", TokenType::If),
+            ("NULL", TokenType::Null),
+            ("or", TokenType::Or),
+            ("print", TokenType::Print),
+            ("return", TokenType::Return),
+            ("super", TokenType::Super),
+            ("this", TokenType::This),
+            ("true", TokenType::True),
+            ("var", TokenType::Var),
+            ("for", TokenType::For),
+            ("while", TokenType::While),
+        ])
+    });

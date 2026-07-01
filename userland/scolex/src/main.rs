@@ -1,13 +1,15 @@
-#![feature(variant_count)]
 use std::{
     fs::read_to_string,
     io::{self, Write},
-    mem,
     process::exit,
 };
 
 use crate::{
+    ast::Expr,
+    ast_printer::print,
     error::{read_err_flag, set_err_flag},
+    interpreter::Interpreter,
+    parser::Parser,
     scanner::Scanner,
     token::{GenericToken, Literal},
 };
@@ -15,6 +17,7 @@ use crate::{
 mod ast;
 mod ast_printer;
 mod error;
+mod interpreter;
 mod parser;
 mod scanner;
 mod token;
@@ -69,5 +72,12 @@ fn run_prompt() {
 fn run(source: &str) {
     let mut scanner = Scanner::new(source);
     let tokens: Vec<Token> = scanner.scan_tokens();
-    let _ = tokens.iter().map(|f| print!("{:?} ", f.to_string()));
+    let mut parser = Parser::new(tokens);
+    let expr = parser.parse();
+    let interpreter = Interpreter::new();
+    interpreter.interpret(expr);
+
+    if read_err_flag() {
+        exit(65);
+    }
 }

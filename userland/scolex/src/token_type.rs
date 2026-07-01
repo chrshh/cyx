@@ -1,6 +1,4 @@
-use strum::EnumIter;
-
-#[derive(Debug, PartialEq, Clone, Copy, EnumIter)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum TokenType {
     /* single char tokens */
     LeftParen,
@@ -48,6 +46,7 @@ pub enum TokenType {
     Var,
     While,
 
+    #[default]
     Eof,
 }
 

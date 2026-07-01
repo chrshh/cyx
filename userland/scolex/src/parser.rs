@@ -1,5 +1,10 @@
+use std::ops::Deref;
+
 use crate::{
-    Token, ast::Expr, token::Literal, token_type::TokenType,
+    Token,
+    ast::{Binary, Expr, ExprLiteral, Grouping, Unary},
+    token::Literal,
+    token_type::TokenType,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -14,8 +19,12 @@ impl<'a> Parser<'a> {
         Self {
             tokens,
             current: 0,
-            err_str: "".as_ref(),
+            err_str: "",
         }
+    }
+
+    pub fn parse(&mut self) -> Expr {
+        self.expression().deref().clone()
     }
 
     pub fn expression(&mut self) -> Box<Expr> {
@@ -30,11 +39,11 @@ impl<'a> Parser<'a> {
         while self.expr_matches(token_type_set.clone()) {
             let operator: Token = self.previous();
             let right: Expr = self.comparison();
-            expr = Expr::Binary {
+            expr = Expr::Binary(Binary {
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
-            };
+            });
         }
 
         Box::new(expr)
@@ -52,11 +61,11 @@ impl<'a> Parser<'a> {
         while self.expr_matches(token_type_set.clone()) {
             let operator: Token = self.previous();
             let right: Expr = self.term();
-            expr = Expr::Binary {
+            expr = Expr::Binary(Binary {
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
-            }
+            });
         }
 
         expr
@@ -70,11 +79,11 @@ impl<'a> Parser<'a> {
         while self.expr_matches(token_type_set.clone()) {
             let operator = self.previous();
             let right = self.factor();
-            expr = Expr::Binary {
+            expr = Expr::Binary(Binary {
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
-            }
+            });
         }
 
         expr
@@ -88,11 +97,11 @@ impl<'a> Parser<'a> {
         while self.expr_matches(token_type_set.clone()) {
             let operator = self.previous();
             let right = self.unary();
-            expr = Expr::Binary {
+            expr = Expr::Binary(Binary {
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
-            };
+            });
         }
 
         expr
@@ -105,10 +114,10 @@ impl<'a> Parser<'a> {
         if self.expr_matches(token_type_set) {
             let operator: Token = self.previous();
             let right = self.unary();
-            return Expr::Unary {
+            return Expr::Unary(Unary {
                 operator,
                 right: Box::new(right),
-            };
+            });
         }
 
         self.primary()
@@ -117,31 +126,31 @@ impl<'a> Parser<'a> {
     pub fn primary(&mut self) -> Expr {
         let tk_vek = Vec::from([TokenType::False]);
         if self.expr_matches(tk_vek) {
-            return Expr::Literal {
+            return Expr::Literal(ExprLiteral {
                 value: Literal::Bool(true),
-            };
+            });
         }
 
         let tk_vek = Vec::from([TokenType::True]);
         if self.expr_matches(tk_vek) {
-            return Expr::Literal {
+            return Expr::Literal(ExprLiteral {
                 value: Literal::Bool(true),
-            };
+            });
         }
 
         let tk_vek = Vec::from([TokenType::Null]);
         if self.expr_matches(tk_vek) {
-            return Expr::Literal {
+            return Expr::Literal(ExprLiteral {
                 value: Literal::Null,
-            };
+            });
         }
 
         let tk_vek =
             Vec::from([TokenType::Number, TokenType::String]);
         if self.expr_matches(tk_vek) {
-            return Expr::Literal {
+            return Expr::Literal(ExprLiteral {
                 value: self.previous().literal.unwrap_or_default(),
-            };
+            });
         }
 
         let tk_vek = Vec::from([TokenType::LeftParen]);
@@ -150,11 +159,12 @@ impl<'a> Parser<'a> {
             self.consume(
                 TokenType::RightParen,
                 "Expect ')' after expression.",
-            );
-            return Expr::Grouping { expression: expr };
+            )
+            .unwrap_or_default();
+            return Expr::Grouping(Grouping { expression: expr });
         }
 
-        Expr::default()
+        Expr::Literal(ExprLiteral::default())
     }
 
     pub fn consume(
@@ -171,17 +181,37 @@ impl<'a> Parser<'a> {
 
     pub fn error<T: AsRef<str>>(&self, token: Token, msg: T) {
         if token.token_type == TokenType::Eof {
-            self.report(
-                token.line,
-                " at end",
-                &msg.as_ref().to_owned(),
-            );
+            self.report(token.line, " at end", msg.as_ref());
         } else {
             self.report(
                 token.line,
                 " at '".to_string() + token.lexeme.as_str() + "'",
                 msg.as_ref().to_owned(),
             );
+        }
+    }
+
+    pub fn synchronize(&mut self) {
+        self.advance();
+
+        while !self.is_at_end() {
+            if self.previous().token_type == TokenType::Semicolon {
+                return;
+            }
+
+            match self.peek().token_type {
+                TokenType::Class
+                | TokenType::Fun
+                | TokenType::Var
+                | TokenType::For
+                | TokenType::If
+                | TokenType::While
+                | TokenType::Print
+                | TokenType::Return => return,
+                _ => {}
+            }
+
+            self.advance();
         }
     }
 
@@ -203,11 +233,10 @@ impl<'a> Parser<'a> {
         &mut self,
         token_types: Vec<TokenType>,
     ) -> bool {
-        token_types.iter().map(|&t| {
-            let ok = self.expr_check(t.clone());
+        token_types.iter().for_each(|&t| {
+            let ok = self.expr_check(t);
             if ok {
                 self.advance();
-                true;
             }
         });
         false

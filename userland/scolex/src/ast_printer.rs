@@ -2,14 +2,10 @@ use crate::{ast::Expr, token::Literal};
 
 pub fn print(expr: &Expr) -> String {
     match expr {
-        Expr::Binary {
-            left,
-            operator,
-            right,
-        } => parenthesize(&operator.lexeme, &[left, right]),
-        Expr::Grouping { expression } => parenthesize("group", &[expression]),
-        Expr::Unary { operator, right } => parenthesize(&operator.lexeme, &[right]),
-        Expr::Literal { value } => match value {
+        Expr::Binary(b) => parenthesize(&b.operator.lexeme, &[&b.left, &b.right]),
+        Expr::Grouping(g) => parenthesize("group", &[&g.expression]),
+        Expr::Unary(u) => parenthesize(&u.operator.lexeme, &[&u.right]),
+        Expr::Literal(l) => match &l.value {
             Literal::Number(n) => n.to_string(),
             Literal::String(s) => s.clone(),
             Literal::Bool(b) => b.to_string(),
