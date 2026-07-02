@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::{
     Token,
     ast::{Binary, Expr, ExprLiteral, Grouping, Unary},
@@ -14,6 +12,23 @@ pub struct Parser<'a> {
     pub err_str: &'a str,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Stmt {
+    pub expression: Expr,
+}
+
+impl Stmt {
+    pub fn print(value: Expr) -> Stmt {
+        Stmt::expression(Expr::Literal(ExprLiteral::default()))
+    }
+
+    pub fn expression(expr: Expr) -> Stmt {
+        Stmt::expression(Expr::Literal(ExprLiteral::default()))
+    }
+
+    pub fn accept(&self) {}
+}
+
 impl<'a> Parser<'a> {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self {
@@ -23,8 +38,12 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Expr {
-        self.expression().deref().clone()
+    pub fn parse(&mut self) -> Vec<Stmt> {
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.is_at_end() {
+            statements.push(self.statement());
+        }
+        statements
     }
 
     pub fn expression(&mut self) -> Box<Expr> {
@@ -240,6 +259,29 @@ impl<'a> Parser<'a> {
             }
         });
         false
+    }
+
+    pub fn statement(&mut self) -> Stmt {
+        if self.expr_matches(Vec::from([TokenType::Print])) {
+            return self.print_statement();
+        }
+
+        self.expression_statement()
+    }
+
+    pub fn print_statement(&mut self) -> Stmt {
+        let value: Expr = *self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after value.");
+        Stmt::print(value)
+    }
+
+    pub fn expression_statement(&mut self) -> Stmt {
+        let expr: Expr = *self.expression();
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after expression.",
+        );
+        Stmt::expression(expr)
     }
 
     pub fn expr_check(&self, token_type: TokenType) -> bool {

@@ -1,5 +1,6 @@
 use crate::{
     ast::{Binary, Expr, ExprLiteral, Grouping, Unary},
+    parser::Stmt,
     token::Literal,
     token_type::TokenType,
 };
@@ -11,9 +12,12 @@ impl Interpreter {
     pub fn new() -> Self {
         Self
     }
-    pub fn interpret(&self, expr: Expr) {
-        let value = self.evaluate(expr);
-        println!("{:?}", self.stringify(&value));
+    pub fn interpret(&self, statements: &mut Vec<Stmt>) {
+        statements.iter().for_each(|s| self.execute(&s.clone()))
+    }
+
+    pub fn execute(&self, stmt: &Stmt) {
+        stmt.accept();
     }
 
     pub fn evaluate(&self, expr: Expr) -> Literal {
@@ -27,6 +31,15 @@ impl Interpreter {
             Expr::Unary(unary) => self.visit_unary_expr(unary),
             Expr::Binary(binary) => self.visit_binary_expr(binary),
         }
+    }
+
+    pub fn visit_expression_stmt(&self, stmt: Stmt) {
+        self.evaluate(stmt.expression);
+    }
+
+    pub fn visit_print_stmt(&self, stmt: Stmt) {
+        let value = self.evaluate(stmt.expression);
+        print!("{:?}", self.stringify(&value));
     }
 
     pub fn visit_literal_expr(&self, expr: ExprLiteral) -> Literal {

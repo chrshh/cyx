@@ -9,7 +9,7 @@ use crate::{
     ast_printer::print,
     error::{read_err_flag, set_err_flag},
     interpreter::Interpreter,
-    parser::Parser,
+    parser::{Parser, Stmt},
     scanner::Scanner,
     token::{GenericToken, Literal},
 };
@@ -73,9 +73,9 @@ fn run(source: &str) {
     let mut scanner = Scanner::new(source);
     let tokens: Vec<Token> = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expr = parser.parse();
+    let mut statements: Vec<Stmt> = parser.parse();
     let interpreter = Interpreter::new();
-    interpreter.interpret(expr);
+    interpreter.interpret(&mut statements);
 
     if read_err_flag() {
         exit(65);
