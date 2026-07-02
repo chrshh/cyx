@@ -1,4 +1,4 @@
-use crate::Token;
+use crate::{Token, token::Literal};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ExprLiteral {
@@ -26,9 +26,19 @@ pub struct Unary {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Assignment {
+    pub expression: Box<Expr>,
+    pub token: String,
+    pub value: Literal,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Binary(Binary),
     Grouping(Grouping),
     Literal(ExprLiteral),
     Unary(Unary),
+    Variable(Token),
+    Assignment(Assignment),
+    Null,
 }

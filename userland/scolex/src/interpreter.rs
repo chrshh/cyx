@@ -1,26 +1,42 @@
 use crate::{
-    ast::{Binary, Expr, ExprLiteral, Grouping, Unary},
+    Token,
+    ast::{Assignment, Binary, Expr, ExprLiteral, Grouping, Unary},
+    environment::Environment,
     parser::Stmt,
     token::Literal,
     token_type::TokenType,
 };
 
 #[derive(Debug)]
-pub struct Interpreter;
+pub struct Interpreter {
+    pub environment: Environment,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self
+        Self {
+            environment: Environment::new(),
+        }
     }
-    pub fn interpret(&self, statements: &mut Vec<Stmt>) {
-        statements.iter().for_each(|s| self.execute(&s.clone()))
+    pub fn interpret(&mut self, statements: Vec<Stmt>) {
+        for stmt in statements {
+            self.execute(stmt);
+        }
     }
 
-    pub fn execute(&self, stmt: &Stmt) {
-        stmt.accept();
+    pub fn execute(&mut self, stmt: Stmt) {
+        match stmt {
+            Stmt::Expression(expr) => {
+                self.visit_expression_stmt(expr)
+            }
+            Stmt::Print(expr) => self.visit_print_stmt(expr),
+            Stmt::Var { name, initializer } => {
+                self.visit_var_stmt(name, initializer)
+            }
+        }
     }
 
-    pub fn evaluate(&self, expr: Expr) -> Literal {
+    pub fn evaluate(&mut self, expr: Expr) -> Literal {
         match expr {
             Expr::Literal(literal) => {
                 self.visit_literal_expr(literal)
@@ -30,27 +46,49 @@ impl Interpreter {
             }
             Expr::Unary(unary) => self.visit_unary_expr(unary),
             Expr::Binary(binary) => self.visit_binary_expr(binary),
+            Expr::Variable(variable) => {
+                self.visit_variable_expr(variable)
+            }
+            Expr::Assignment(assignment) => {
+                self.visit_assign_expr(assignment)
+            }
+            Expr::Null => Literal::Null,
         }
     }
 
-    pub fn visit_expression_stmt(&self, stmt: Stmt) {
-        self.evaluate(stmt.expression);
+    pub fn visit_expression_stmt(&mut self, expr: Expr) {
+        self.evaluate(expr);
     }
 
-    pub fn visit_print_stmt(&self, stmt: Stmt) {
-        let value = self.evaluate(stmt.expression);
-        print!("{:?}", self.stringify(&value));
+    pub fn visit_print_stmt(&mut self, expr: Expr) {
+        let value = self.evaluate(expr);
+        println!("{}", self.stringify(&value));
+    }
+
+    pub fn visit_var_stmt(&mut self, name: Token, initializer: Expr) {
+        let value = self.evaluate(initializer);
+        self.environment.define(name.lexeme, value);
+    }
+
+    pub fn visit_variable_expr(&self, variable: Token) -> Literal {
+        self.environment.get(&variable)
     }
 
     pub fn visit_literal_expr(&self, expr: ExprLiteral) -> Literal {
         expr.value
     }
 
-    pub fn visit_grouping_expr(&self, expr: Grouping) -> Literal {
+    pub fn visit_grouping_expr(&mut self, expr: Grouping) -> Literal {
         self.evaluate(*expr.expression)
     }
 
-    pub fn visit_unary_expr(&self, expr: Unary) -> Literal {
+    pub fn visit_assign_expr(&mut self, expr: Assignment) -> Literal {
+        let value = self.evaluate(*expr.expression);
+        self.environment.assign(expr.token, value.clone());
+        value
+    }
+
+    pub fn visit_unary_expr(&mut self, expr: Unary) -> Literal {
         let right = self.evaluate(*expr.right);
 
         match expr.operator.token_type {
@@ -66,7 +104,7 @@ impl Interpreter {
         }
     }
 
-    pub fn visit_binary_expr(&self, expr: Binary) -> Literal {
+    pub fn visit_binary_expr(&mut self, expr: Binary) -> Literal {
         let left = self.evaluate(*expr.left);
         let right = self.evaluate(*expr.right);
 

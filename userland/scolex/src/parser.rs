@@ -1,6 +1,6 @@
 use crate::{
     Token,
-    ast::{Binary, Expr, ExprLiteral, Grouping, Unary},
+    ast::{Assignment, Binary, Expr, ExprLiteral, Grouping, Unary},
     token::Literal,
     token_type::TokenType,
 };
@@ -13,20 +13,10 @@ pub struct Parser<'a> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Stmt {
-    pub expression: Expr,
-}
-
-impl Stmt {
-    pub fn print(value: Expr) -> Stmt {
-        Stmt::expression(Expr::Literal(ExprLiteral::default()))
-    }
-
-    pub fn expression(expr: Expr) -> Stmt {
-        Stmt::expression(Expr::Literal(ExprLiteral::default()))
-    }
-
-    pub fn accept(&self) {}
+pub enum Stmt {
+    Expression(Expr),
+    Print(Expr),
+    Var { name: Token, initializer: Expr },
 }
 
 impl<'a> Parser<'a> {
@@ -41,13 +31,40 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Vec<Stmt> {
         let mut statements: Vec<Stmt> = Vec::new();
         while !self.is_at_end() {
-            statements.push(self.statement());
+            statements.push(self.declaration());
         }
         statements
     }
 
+    pub fn declaration(&mut self) -> Stmt {
+        if self.expr_matches(Vec::from([TokenType::Var])) {
+            return self.var_declaration();
+        }
+
+        self.statement()
+    }
+
+    pub fn var_declaration(&mut self) -> Stmt {
+        let name = self
+            .consume(TokenType::Identifier, "Expect variable name.")
+            .expect("Expect variable name.");
+
+        let mut initializer = Expr::Null;
+        if self.expr_matches(Vec::from([TokenType::Equal])) {
+            initializer = *self.expression();
+        }
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        )
+        .expect("Expect ';' after variable declaration.");
+
+        Stmt::Var { name, initializer }
+    }
+
     pub fn expression(&mut self) -> Box<Expr> {
-        self.equality()
+        Box::new(self.assignment())
     }
 
     pub fn equality(&mut self) -> Box<Expr> {
@@ -142,6 +159,35 @@ impl<'a> Parser<'a> {
         self.primary()
     }
 
+    pub fn assignment(&mut self) -> Expr {
+        let expr = self.equality();
+
+        if self.expr_matches(Vec::from([TokenType::Equal])) {
+            let _equals = self.previous();
+            let value = self.assignment();
+
+            /* run a match here to check for variable type */
+            match *expr {
+                Expr::Variable(var) => {
+                    let name = var.lexeme;
+                    match value {
+                        Expr::Literal(val) => {
+                            return Expr::Assignment(Assignment {
+                                expression: Box::new(Expr::Null),
+                                token: name,
+                                value: val.value,
+                            });
+                        }
+                        _ => panic!("Invalid assignment target."),
+                    }
+                }
+                _ => panic!("Invalid assignment target."),
+            }
+        }
+
+        *expr
+    }
+
     pub fn primary(&mut self) -> Expr {
         let tk_vek = Vec::from([TokenType::False]);
         if self.expr_matches(tk_vek) {
@@ -170,6 +216,11 @@ impl<'a> Parser<'a> {
             return Expr::Literal(ExprLiteral {
                 value: self.previous().literal.unwrap_or_default(),
             });
+        }
+
+        let tk_vek = Vec::from([TokenType::Identifier]);
+        if self.expr_matches(tk_vek) {
+            return Expr::Variable(self.previous());
         }
 
         let tk_vek = Vec::from([TokenType::LeftParen]);
@@ -252,12 +303,12 @@ impl<'a> Parser<'a> {
         &mut self,
         token_types: Vec<TokenType>,
     ) -> bool {
-        token_types.iter().for_each(|&t| {
-            let ok = self.expr_check(t);
-            if ok {
+        for t in token_types {
+            if self.expr_check(t) {
                 self.advance();
+                return true;
             }
-        });
+        }
         false
     }
 
@@ -271,8 +322,9 @@ impl<'a> Parser<'a> {
 
     pub fn print_statement(&mut self) -> Stmt {
         let value: Expr = *self.expression();
-        self.consume(TokenType::Semicolon, "Expect ';' after value.");
-        Stmt::print(value)
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")
+            .expect("Expect ';' after value.");
+        Stmt::Print(value)
     }
 
     pub fn expression_statement(&mut self) -> Stmt {
@@ -280,8 +332,9 @@ impl<'a> Parser<'a> {
         self.consume(
             TokenType::Semicolon,
             "Expect ';' after expression.",
-        );
-        Stmt::expression(expr)
+        )
+        .expect("Expect ';' after expression.");
+        Stmt::Expression(expr)
     }
 
     pub fn expr_check(&self, token_type: TokenType) -> bool {

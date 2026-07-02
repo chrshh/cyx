@@ -5,8 +5,6 @@ use std::{
 };
 
 use crate::{
-    ast::Expr,
-    ast_printer::print,
     error::{read_err_flag, set_err_flag},
     interpreter::Interpreter,
     parser::{Parser, Stmt},
@@ -16,6 +14,7 @@ use crate::{
 
 mod ast;
 mod ast_printer;
+mod environment;
 mod error;
 mod interpreter;
 mod parser;
@@ -73,9 +72,9 @@ fn run(source: &str) {
     let mut scanner = Scanner::new(source);
     let tokens: Vec<Token> = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let mut statements: Vec<Stmt> = parser.parse();
-    let interpreter = Interpreter::new();
-    interpreter.interpret(&mut statements);
+    let statements: Vec<Stmt> = parser.parse();
+    let mut interpreter = Interpreter::new();
+    interpreter.interpret(statements);
 
     if read_err_flag() {
         exit(65);

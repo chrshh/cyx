@@ -11,6 +11,8 @@ pub fn print(expr: &Expr) -> String {
             Literal::Bool(b) => b.to_string(),
             Literal::Null => "NULL".to_string(),
         },
+        Expr::Variable(name) => name.lexeme.clone(),
+        Expr::Null => "NULL".to_string(),
     }
 }
 

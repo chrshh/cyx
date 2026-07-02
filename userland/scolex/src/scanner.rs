@@ -34,12 +34,10 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn scan_tokens(&mut self) -> Vec<Token> {
-        let i = 0;
-        let _ = self.source.chars().next().map(|_| {
+        while !self.is_at_end() {
             self.start = self.current;
-            let _ = i.add(1);
             self.scan_token();
-        });
+        }
 
         self.add_token_from_token_type(TokenType::Eof);
 
