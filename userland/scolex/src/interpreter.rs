@@ -1,3 +1,5 @@
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
 use crate::{
     Token,
     ast::{
@@ -12,13 +14,13 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Interpreter {
-    pub environment: Environment,
+    pub environment: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            environment: Environment::new(),
+            environment: Rc::new(RefCell::new(Environment::new())),
         }
     }
     pub fn interpret(&mut self, statements: Vec<Stmt>) {
@@ -50,12 +52,14 @@ impl Interpreter {
     pub fn execute_block_stmt(
         &mut self,
         statements: Vec<Stmt>,
-        environment: Environment,
+        environment: Rc<RefCell<Environment>>,
     ) {
-        let previous = Environment::from(environment.clone());
+        let previous = Rc::clone(&self.environment);
         self.environment = environment;
 
-        statements.iter().for_each(|s| self.execute(s.clone()));
+        for s in statements {
+            self.execute(s);
+        }
 
         self.environment = previous;
     }
@@ -94,7 +98,7 @@ impl Interpreter {
 
     pub fn visit_var_stmt(&mut self, name: Token, initializer: Expr) {
         let value = self.evaluate(initializer);
-        self.environment.define(name.lexeme, value);
+        self.environment.borrow_mut().define(name.lexeme, value);
     }
 
     pub fn visit_if_stmt(&mut self, if_stmt: If) {
@@ -114,16 +118,23 @@ impl Interpreter {
                 self.evaluate(while_stmt.condition.clone());
             if self.is_truthy(&eval_literal) {
                 self.execute(while_stmt.body.borrow().clone());
+            } else {
+                break;
             }
         }
     }
 
     pub fn visit_block_stmt(&mut self, stmt: Block) {
-        self.execute_block_stmt(stmt.statements, Environment::new());
+        let scope =
+            Environment::with_enclosing(Rc::clone(&self.environment));
+        self.execute_block_stmt(
+            stmt.statements,
+            Rc::new(RefCell::new(scope)),
+        );
     }
 
     pub fn visit_variable_expr(&self, variable: Token) -> Literal {
-        self.environment.get(&variable)
+        self.environment.borrow().get(&variable)
     }
 
     pub fn visit_literal_expr(&self, expr: ExprLiteral) -> Literal {
@@ -135,8 +146,10 @@ impl Interpreter {
     }
 
     pub fn visit_assign_expr(&mut self, expr: Assignment) -> Literal {
-        let value = self.evaluate(*expr.expression);
-        self.environment.assign(expr.token, value.clone());
+        let value = self.evaluate(*expr.value);
+        self.environment
+            .borrow_mut()
+            .assign(expr.token, value.clone());
         value
     }
 
@@ -184,30 +197,18 @@ impl Interpreter {
                         TokenType::Slash => Literal::Number(l / r),
                         TokenType::Star => Literal::Number(l * r),
                         TokenType::Plus => Literal::Number(l + r),
-                        TokenType::BangEqual => Literal::Number(
-                            !self.is_equal(&left, &right) as u64
-                                as f64,
+                        TokenType::BangEqual => Literal::Bool(
+                            !self.is_equal(&left, &right),
                         ),
-                        TokenType::EqualEqual => Literal::Number(
-                            self.is_equal(&left, &right) as u64
-                                as f64,
+                        TokenType::EqualEqual => Literal::Bool(
+                            self.is_equal(&left, &right),
                         ),
-                        TokenType::Greater => {
-                            let n = (l > r) as i64;
-                            Literal::Number(n as f64)
-                        }
+                        TokenType::Greater => Literal::Bool(l > r),
                         TokenType::GreaterEqual => {
-                            let n = (l >= r) as i64;
-                            Literal::Number(n as f64)
+                            Literal::Bool(l >= r)
                         }
-                        TokenType::Less => {
-                            let n = (l < r) as i64;
-                            Literal::Number(n as f64)
-                        }
-                        TokenType::LessEqual => {
-                            let n = (l <= r) as i64;
-                            Literal::Number(n as f64)
-                        }
+                        TokenType::Less => Literal::Bool(l < r),
+                        TokenType::LessEqual => Literal::Bool(l <= r),
                         _ => Literal::Null,
                     }
                 }

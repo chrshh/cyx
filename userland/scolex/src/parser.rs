@@ -17,9 +17,21 @@ pub struct Parser<'a> {
     pub err_str: &'a str,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct Block {
     pub statements: Vec<Stmt>,
+}
+
+impl Block {
+    pub fn combine_statements(
+        original: Stmt,
+        additional: Stmt,
+    ) -> Vec<Stmt> {
+        let mut v: Vec<Stmt> = Vec::new();
+        v.push(original);
+        v.push(additional);
+        v
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -196,17 +208,11 @@ impl<'a> Parser<'a> {
             /* run a match here to check for variable type */
             match expr {
                 Expr::Variable(var) => {
-                    let name = var.lexeme;
-                    match value {
-                        Expr::Literal(val) => {
-                            return Expr::Assignment(Assignment {
-                                expression: Box::new(Expr::Null),
-                                token: name,
-                                value: val.value,
-                            });
-                        }
-                        _ => panic!("Invalid assignment target."),
-                    }
+                    let name = var.lexeme.clone();
+                    return Expr::Assignment(Assignment {
+                        token: name,
+                        value: Box::new(value),
+                    });
                 }
                 _ => panic!("Invalid assignment target."),
             }
@@ -244,7 +250,6 @@ impl<'a> Parser<'a> {
             });
 
             expr = tmp.into();
-            return *expr;
         }
 
         *expr
@@ -391,6 +396,10 @@ impl<'a> Parser<'a> {
             return self.while_statement();
         }
 
+        if self.expr_matches(Vec::from([TokenType::For])) {
+            return self.for_statement();
+        }
+
         self.expression_statement()
     }
 
@@ -431,6 +440,69 @@ impl<'a> Parser<'a> {
             condition: *condition,
             body: Rc::new(RefCell::new(body)),
         })
+    }
+
+    pub fn for_statement(&mut self) -> Stmt {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.");
+
+        let mut initializer: Stmt = Stmt::Null;
+        if self.expr_matches(Vec::from([TokenType::Semicolon])) {
+            initializer = Stmt::Null;
+        } else if self.expr_matches(Vec::from([TokenType::Var])) {
+            initializer = self.var_declaration();
+        } else {
+            initializer = self.expression_statement();
+        }
+
+        let mut condition: Expr = Expr::Null;
+        if !self.expr_check(TokenType::Semicolon) {
+            condition = *self.expression().clone();
+        }
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after loop condition.",
+        );
+
+        let mut increment: Expr = Expr::Null;
+        if !self.expr_check(TokenType::RightParen) {
+            increment = *self.expression();
+        }
+        self.consume(
+            TokenType::RightParen,
+            "Expect ')' after for clauses",
+        )
+        .expect("Expect ')' after for claudes.");
+
+        let mut body = self.statement();
+
+        if increment != Expr::Null {
+            let incr = Stmt::Expression(increment);
+            body = Stmt::Block(Block {
+                statements: Block::combine_statements(body, incr),
+            });
+        }
+
+        if condition == Expr::Null {
+            condition = Expr::Literal(ExprLiteral {
+                value: Literal::Bool(true),
+            });
+        }
+
+        body = Stmt::While(While {
+            condition,
+            body: Rc::new(RefCell::new(body)),
+        });
+
+        if initializer != Stmt::Null {
+            body = Stmt::Block(Block {
+                statements: Block::combine_statements(
+                    initializer,
+                    body,
+                ),
+            })
+        }
+
+        body
     }
 
     pub fn if_statement(&mut self) -> Stmt {

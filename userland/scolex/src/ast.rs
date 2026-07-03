@@ -27,9 +27,8 @@ pub struct Unary {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Assignment {
-    pub expression: Box<Expr>,
     pub token: String,
-    pub value: Literal,
+    pub value: Box<Expr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

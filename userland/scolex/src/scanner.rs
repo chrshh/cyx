@@ -1,9 +1,7 @@
-use std::{collections::HashMap, ops::Add, sync::LazyLock};
+use std::{collections::HashMap, sync::LazyLock};
 
 use crate::{
-    L, Token, error as Scolex,
-    token::{Literal, Tokens},
-    token_type::TokenType,
+    L, Token, error as Scolex, token::Literal, token_type::TokenType,
 };
 
 #[derive(Debug)]
@@ -41,7 +39,7 @@ impl<'a> Scanner<'a> {
 
         self.add_token_from_token_type(TokenType::Eof);
 
-        println!("{}", Tokens(self.tokens.clone()));
+        // println!("{}", Tokens(self.tokens.clone()));
         self.tokens.clone()
     }
 
@@ -203,7 +201,8 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn add_identifier_token(&mut self, t: TokenType) {
-        let token = Token::from(t, String::new(), L::Null, self.line);
+        let text = self.source[self.start..self.current].to_string();
+        let token = Token::from(t, text, L::Null, self.line);
         self.add(token);
     }
 
@@ -212,8 +211,8 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn advance(&mut self) -> Option<char> {
-        self.current += 1;
         let c = self.source[self.current..].chars().next();
+        self.current += 1;
         match c.is_none() {
             true => None,
             false => c,

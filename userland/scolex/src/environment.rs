@@ -4,33 +4,14 @@ use crate::{Token, token::Literal};
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Environment {
-    pub enclosing: Rc<RefCell<Environment>>,
+    pub enclosing: Option<Rc<RefCell<Environment>>>,
     pub values: HashMap<String, Literal>,
 }
-
-// #[derive(Debug)]
-// struct EnclosingSelector<T> {
-//     value: T,
-// }
-//
-// impl<T> Deref for EnclosingSelector<T> {
-//     type Target = T;
-//
-//     fn deref(&self) -> &Self::Target {
-//         &self.value
-//     }
-// }
-//
-// impl<T> DerefMut for EnclosingSelector<T> {
-//     fn deref_mut(&mut self) -> &mut Self::Target {
-//         &mut self.value
-//     }
-// }
 
 impl Environment {
     pub fn new() -> Environment {
         Environment {
-            enclosing: Rc::new(RefCell::new(Environment::default())),
+            enclosing: None,
             values: HashMap::new(),
         }
     }
@@ -42,40 +23,43 @@ impl Environment {
         }
     }
 
+    pub fn with_enclosing(
+        enclosing: Rc<RefCell<Environment>>,
+    ) -> Environment {
+        Environment {
+            enclosing: Some(enclosing),
+            values: HashMap::new(),
+        }
+    }
+
     pub fn define(&mut self, name: String, value: Literal) {
         self.values.insert(name, value);
     }
 
     pub fn get(&self, name: &Token) -> Literal {
-        if self.values.contains_key(&name.lexeme) {
-            return self
-                .values
-                .get(&name.lexeme)
-                .cloned()
-                .expect("Undefined variable");
+        if let Some(v) = self.values.get(&name.lexeme) {
+            return v.clone();
         }
 
-        if self.enclosing != None.unwrap() {
-            return self.enclosing.borrow().get(name);
+        if let Some(enclosing) = &self.enclosing {
+            return enclosing.borrow().get(name);
         }
-
-        panic!("Undefined variable '{}'", name.lexeme);
+        panic!("Undefined variable: '{}'", name.lexeme);
     }
 
     pub fn assign(&mut self, name: String, value: Literal) {
         if let std::collections::hash_map::Entry::Occupied(mut e) =
-            self.values.entry(name.to_string())
+            self.values.entry(name.clone())
         {
-            Some(e.insert(value))
-                .expect("Undefined variabled in environemtn.assign");
+            e.insert(value);
             return;
         }
 
-        if self.enclosing != None.unwrap() {
-            self.enclosing.take().assign(name, value);
+        if let Some(enclosing) = &self.enclosing {
+            enclosing.borrow_mut().assign(name, value);
             return;
         }
 
-        panic!("Undefined variable in environment.assign");
+        panic!("Undefined variable: '{}'", name);
     }
 }
