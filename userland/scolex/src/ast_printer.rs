@@ -2,9 +2,13 @@ use crate::{ast::Expr, token::Literal};
 
 pub fn print(expr: &Expr) -> String {
     match expr {
-        Expr::Binary(b) => parenthesize(&b.operator.lexeme, &[&b.left, &b.right]),
+        Expr::Binary(b) => {
+            parenthesize(&b.operator.lexeme, &[&b.left, &b.right])
+        }
         Expr::Grouping(g) => parenthesize("group", &[&g.expression]),
-        Expr::Unary(u) => parenthesize(&u.operator.lexeme, &[&u.right]),
+        Expr::Unary(u) => {
+            parenthesize(&u.operator.lexeme, &[&u.right])
+        }
         Expr::Literal(l) => match &l.value {
             Literal::Number(n) => n.to_string(),
             Literal::String(s) => s.clone(),
@@ -12,6 +16,7 @@ pub fn print(expr: &Expr) -> String {
             Literal::Null => "NULL".to_string(),
         },
         Expr::Variable(name) => name.lexeme.clone(),
+        Expr::Assignment(assignment) => assignment.token.to_string(),
         Expr::Null => "NULL".to_string(),
     }
 }

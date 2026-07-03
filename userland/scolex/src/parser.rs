@@ -1,6 +1,11 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     Token,
-    ast::{Assignment, Binary, Expr, ExprLiteral, Grouping, Unary},
+    ast::{
+        Assignment, Binary, Expr, ExprLiteral, Grouping, Logical,
+        Unary,
+    },
     token::Literal,
     token_type::TokenType,
 };
@@ -13,10 +18,32 @@ pub struct Parser<'a> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Block {
+    pub statements: Vec<Stmt>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct If {
+    pub condition: Expr,
+    pub then_branch: Rc<RefCell<Stmt>>,
+    pub else_branch: Rc<RefCell<Stmt>>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct While {
+    pub condition: Expr,
+    pub body: Rc<RefCell<Stmt>>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
     Var { name: Token, initializer: Expr },
+    Block(Block),
+    If(If),
+    While(While),
+    Null,
 }
 
 impl<'a> Parser<'a> {
@@ -160,14 +187,14 @@ impl<'a> Parser<'a> {
     }
 
     pub fn assignment(&mut self) -> Expr {
-        let expr = self.equality();
+        let expr = self.or();
 
         if self.expr_matches(Vec::from([TokenType::Equal])) {
             let _equals = self.previous();
             let value = self.assignment();
 
             /* run a match here to check for variable type */
-            match *expr {
+            match expr {
                 Expr::Variable(var) => {
                     let name = var.lexeme;
                     match value {
@@ -183,6 +210,41 @@ impl<'a> Parser<'a> {
                 }
                 _ => panic!("Invalid assignment target."),
             }
+        }
+
+        expr
+    }
+
+    pub fn or(&mut self) -> Expr {
+        let mut expr = self.and();
+
+        while self.expr_matches(Vec::from([TokenType::Or])) {
+            let operator = self.previous();
+            let right = self.and();
+            expr = Expr::Logical(Logical {
+                left: expr.into(),
+                operator,
+                right: Box::new(right),
+            });
+        }
+
+        expr
+    }
+
+    pub fn and(&mut self) -> Expr {
+        let mut expr = self.equality();
+
+        while self.expr_matches(Vec::from([TokenType::And])) {
+            let operator = self.previous();
+            let right = self.equality();
+            let tmp = Expr::Logical(Logical {
+                left: expr.clone(),
+                operator,
+                right,
+            });
+
+            expr = tmp.into();
+            return *expr;
         }
 
         *expr
@@ -317,7 +379,33 @@ impl<'a> Parser<'a> {
             return self.print_statement();
         }
 
+        if self.expr_matches(Vec::from([TokenType::LeftBrace])) {
+            return self.block();
+        }
+
+        if self.expr_matches(Vec::from([TokenType::If])) {
+            return self.if_statement();
+        }
+
+        if self.expr_matches(Vec::from([TokenType::While])) {
+            return self.while_statement();
+        }
+
         self.expression_statement()
+    }
+
+    pub fn block(&mut self) -> Stmt {
+        let mut statements: Vec<Stmt> = Vec::new();
+
+        while !self.expr_check(TokenType::RightBrace)
+            && !self.is_at_end()
+        {
+            statements.push(self.declaration());
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block")
+            .expect("Expect '}' after block");
+        Stmt::Block(Block { statements })
     }
 
     pub fn print_statement(&mut self) -> Stmt {
@@ -325,6 +413,48 @@ impl<'a> Parser<'a> {
         self.consume(TokenType::Semicolon, "Expect ';' after value.")
             .expect("Expect ';' after value.");
         Stmt::Print(value)
+    }
+
+    pub fn while_statement(&mut self) -> Stmt {
+        self.consume(
+            TokenType::LeftParen,
+            "Expect '(' after 'while'.",
+        );
+        let condition = self.expression();
+        self.consume(
+            TokenType::RightParen,
+            "Expect ')' after 'while'.",
+        );
+        let body = self.statement();
+
+        Stmt::While(While {
+            condition: *condition,
+            body: Rc::new(RefCell::new(body)),
+        })
+    }
+
+    pub fn if_statement(&mut self) -> Stmt {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
+        let condition: Expr = *self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after 'if'.");
+
+        let then_branch = self.statement();
+        let mut else_branch = Stmt::Null;
+
+        if self.expr_matches(Vec::from([TokenType::Else])) {
+            else_branch = self.statement();
+        }
+
+        let then_branch = Rc::new(RefCell::new(then_branch));
+        let else_branch = Rc::new(RefCell::new(else_branch));
+
+        Stmt::If({
+            If {
+                condition,
+                then_branch,
+                else_branch,
+            }
+        })
     }
 
     pub fn expression_statement(&mut self) -> Stmt {

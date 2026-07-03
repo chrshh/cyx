@@ -1,8 +1,11 @@
 use crate::{
     Token,
-    ast::{Assignment, Binary, Expr, ExprLiteral, Grouping, Unary},
+    ast::{
+        Assignment, Binary, Expr, ExprLiteral, Grouping, Logical,
+        Unary,
+    },
     environment::Environment,
-    parser::Stmt,
+    parser::{Block, If, Stmt, While},
     token::Literal,
     token_type::TokenType,
 };
@@ -33,13 +36,37 @@ impl Interpreter {
             Stmt::Var { name, initializer } => {
                 self.visit_var_stmt(name, initializer)
             }
+            Stmt::Block(statements) => {
+                self.visit_block_stmt(statements)
+            }
+            Stmt::If(if_stmt) => self.visit_if_stmt(if_stmt),
+            Stmt::While(while_stmt) => {
+                self.visit_while_stmt(while_stmt)
+            }
+            Stmt::Null => println!("NULL IN interpreter.execute"),
         }
+    }
+
+    pub fn execute_block_stmt(
+        &mut self,
+        statements: Vec<Stmt>,
+        environment: Environment,
+    ) {
+        let previous = Environment::from(environment.clone());
+        self.environment = environment;
+
+        statements.iter().for_each(|s| self.execute(s.clone()));
+
+        self.environment = previous;
     }
 
     pub fn evaluate(&mut self, expr: Expr) -> Literal {
         match expr {
             Expr::Literal(literal) => {
                 self.visit_literal_expr(literal)
+            }
+            Expr::Logical(logical) => {
+                self.visit_logical_expr(logical)
             }
             Expr::Grouping(grouping) => {
                 self.visit_grouping_expr(grouping)
@@ -70,6 +97,31 @@ impl Interpreter {
         self.environment.define(name.lexeme, value);
     }
 
+    pub fn visit_if_stmt(&mut self, if_stmt: If) {
+        let eval_literal = self.evaluate(if_stmt.condition);
+        if self.is_truthy(&eval_literal) {
+            let stmt = if_stmt.then_branch.borrow();
+            self.execute(stmt.clone());
+        } else if if_stmt.else_branch.borrow().clone() != Stmt::Null {
+            let stmt = if_stmt.else_branch.borrow();
+            self.execute(stmt.clone());
+        }
+    }
+
+    pub fn visit_while_stmt(&mut self, while_stmt: While) {
+        loop {
+            let eval_literal =
+                self.evaluate(while_stmt.condition.clone());
+            if self.is_truthy(&eval_literal) {
+                self.execute(while_stmt.body.borrow().clone());
+            }
+        }
+    }
+
+    pub fn visit_block_stmt(&mut self, stmt: Block) {
+        self.execute_block_stmt(stmt.statements, Environment::new());
+    }
+
     pub fn visit_variable_expr(&self, variable: Token) -> Literal {
         self.environment.get(&variable)
     }
@@ -86,6 +138,22 @@ impl Interpreter {
         let value = self.evaluate(*expr.expression);
         self.environment.assign(expr.token, value.clone());
         value
+    }
+
+    pub fn visit_logical_expr(&mut self, expr: Logical) -> Literal {
+        let left = self.evaluate(*expr.left);
+
+        if expr.operator.token_type == TokenType::Or {
+            if self.is_truthy(&left) {
+                return left;
+            } else {
+                if !self.is_truthy(&left) {
+                    return left;
+                }
+            }
+        }
+
+        self.evaluate(*expr.right)
     }
 
     pub fn visit_unary_expr(&mut self, expr: Unary) -> Literal {

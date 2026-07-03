@@ -33,10 +33,18 @@ pub struct Assignment {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Logical {
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Binary(Binary),
     Grouping(Grouping),
     Literal(ExprLiteral),
+    Logical(Logical),
     Unary(Unary),
     Variable(Token),
     Assignment(Assignment),

@@ -1,18 +1,44 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{Token, token::Literal};
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Environment {
-    pub enclosing: Rc<Environment>,
+    pub enclosing: Rc<RefCell<Environment>>,
     pub values: HashMap<String, Literal>,
 }
+
+// #[derive(Debug)]
+// struct EnclosingSelector<T> {
+//     value: T,
+// }
+//
+// impl<T> Deref for EnclosingSelector<T> {
+//     type Target = T;
+//
+//     fn deref(&self) -> &Self::Target {
+//         &self.value
+//     }
+// }
+//
+// impl<T> DerefMut for EnclosingSelector<T> {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.value
+//     }
+// }
 
 impl Environment {
     pub fn new() -> Environment {
         Environment {
-            enclosing: Environment::default().into(),
+            enclosing: Rc::new(RefCell::new(Environment::default())),
             values: HashMap::new(),
+        }
+    }
+
+    pub fn from(e: Environment) -> Environment {
+        Environment {
+            enclosing: e.enclosing,
+            values: e.values,
         }
     }
 
@@ -30,22 +56,23 @@ impl Environment {
         }
 
         if self.enclosing != None.unwrap() {
-            return self.enclosing.get(name);
+            return self.enclosing.borrow().get(name);
         }
 
         panic!("Undefined variable '{}'", name.lexeme);
     }
 
     pub fn assign(&mut self, name: String, value: Literal) {
-        if self.values.contains_key(&name) {
-            self.values
-                .insert(name, value)
+        if let std::collections::hash_map::Entry::Occupied(mut e) =
+            self.values.entry(name.to_string())
+        {
+            Some(e.insert(value))
                 .expect("Undefined variabled in environemtn.assign");
             return;
         }
 
         if self.enclosing != None.unwrap() {
-            self.enclosing.assign(name, value);
+            self.enclosing.take().assign(name, value);
             return;
         }
 
