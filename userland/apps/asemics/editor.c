@@ -21,8 +21,6 @@ void initEditor(Editor *e, History *h) {
     e->ui.msg[0]        = '\0';
     e->ui.msg_time      = 0;
     e->ui.cmdline[0]    = '\0';
-    e->ui.last_char[0]  = ' ';
-    e->ui.last_char[1]  = '\0';
     e->syntax           = NULL;
     if (getWindowSize(&e->viewport.height, &e->viewport.width) == -1) die("getWindowSize");
     e->viewport.height -= STATUS_BAR_RESERVE; // status bar space for bottom of screen

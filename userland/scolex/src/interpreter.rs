@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     Token,
@@ -7,6 +7,7 @@ use crate::{
         Unary,
     },
     environment::Environment,
+    error::{self, RuntimeError},
     parser::{Block, If, Stmt, While},
     token::Literal,
     token_type::TokenType,
@@ -23,13 +24,19 @@ impl Interpreter {
             environment: Rc::new(RefCell::new(Environment::new())),
         }
     }
+
     pub fn interpret(&mut self, statements: Vec<Stmt>) {
         for stmt in statements {
-            self.execute(stmt);
+            if let Err(err) = self.execute(stmt) {
+                // Report and stop: like jlox, a runtime error aborts
+                // execution (main then exits 70).
+                error::runtime_error(&err);
+                break;
+            }
         }
     }
 
-    pub fn execute(&mut self, stmt: Stmt) {
+    pub fn execute(&mut self, stmt: Stmt) -> Result<(), RuntimeError> {
         match stmt {
             Stmt::Expression(expr) => {
                 self.visit_expression_stmt(expr)
@@ -45,7 +52,7 @@ impl Interpreter {
             Stmt::While(while_stmt) => {
                 self.visit_while_stmt(while_stmt)
             }
-            Stmt::Null => println!("NULL IN interpreter.execute"),
+            Stmt::Null => Ok(()),
         }
     }
 
@@ -53,18 +60,28 @@ impl Interpreter {
         &mut self,
         statements: Vec<Stmt>,
         environment: Rc<RefCell<Environment>>,
-    ) {
+    ) -> Result<(), RuntimeError> {
         let previous = Rc::clone(&self.environment);
         self.environment = environment;
 
+        // Run the block, but always restore the previous scope
+        // afterwards — even if a statement errors out.
+        let mut result = Ok(());
         for s in statements {
-            self.execute(s);
+            result = self.execute(s);
+            if result.is_err() {
+                break;
+            }
         }
 
         self.environment = previous;
+        result
     }
 
-    pub fn evaluate(&mut self, expr: Expr) -> Literal {
+    pub fn evaluate(
+        &mut self,
+        expr: Expr,
+    ) -> Result<Literal, RuntimeError> {
         match expr {
             Expr::Literal(literal) => {
                 self.visit_literal_expr(literal)
@@ -83,149 +100,231 @@ impl Interpreter {
             Expr::Assignment(assignment) => {
                 self.visit_assign_expr(assignment)
             }
-            Expr::Null => Literal::Null,
+            Expr::Null => Ok(Literal::Null),
         }
     }
 
-    pub fn visit_expression_stmt(&mut self, expr: Expr) {
-        self.evaluate(expr);
+    pub fn visit_expression_stmt(
+        &mut self,
+        expr: Expr,
+    ) -> Result<(), RuntimeError> {
+        self.evaluate(expr)?;
+        Ok(())
     }
 
-    pub fn visit_print_stmt(&mut self, expr: Expr) {
-        let value = self.evaluate(expr);
+    pub fn visit_print_stmt(
+        &mut self,
+        expr: Expr,
+    ) -> Result<(), RuntimeError> {
+        let value = self.evaluate(expr)?;
         println!("{}", self.stringify(&value));
+        Ok(())
     }
 
-    pub fn visit_var_stmt(&mut self, name: Token, initializer: Expr) {
-        let value = self.evaluate(initializer);
+    pub fn visit_var_stmt(
+        &mut self,
+        name: Token,
+        initializer: Expr,
+    ) -> Result<(), RuntimeError> {
+        let value = self.evaluate(initializer)?;
         self.environment.borrow_mut().define(name.lexeme, value);
+        Ok(())
     }
 
-    pub fn visit_if_stmt(&mut self, if_stmt: If) {
-        let eval_literal = self.evaluate(if_stmt.condition);
-        if self.is_truthy(&eval_literal) {
-            let stmt = if_stmt.then_branch.borrow();
-            self.execute(stmt.clone());
+    pub fn visit_if_stmt(
+        &mut self,
+        if_stmt: If,
+    ) -> Result<(), RuntimeError> {
+        let condition = self.evaluate(if_stmt.condition)?;
+        if self.is_truthy(&condition) {
+            let stmt = if_stmt.then_branch.borrow().clone();
+            self.execute(stmt)?;
         } else if if_stmt.else_branch.borrow().clone() != Stmt::Null {
-            let stmt = if_stmt.else_branch.borrow();
-            self.execute(stmt.clone());
+            let stmt = if_stmt.else_branch.borrow().clone();
+            self.execute(stmt)?;
         }
+        Ok(())
     }
 
-    pub fn visit_while_stmt(&mut self, while_stmt: While) {
+    pub fn visit_while_stmt(
+        &mut self,
+        while_stmt: While,
+    ) -> Result<(), RuntimeError> {
         loop {
-            let eval_literal =
-                self.evaluate(while_stmt.condition.clone());
-            if self.is_truthy(&eval_literal) {
-                self.execute(while_stmt.body.borrow().clone());
-            } else {
+            let condition =
+                self.evaluate(while_stmt.condition.clone())?;
+            if !self.is_truthy(&condition) {
                 break;
             }
+            let body = while_stmt.body.borrow().clone();
+            self.execute(body)?;
         }
+        Ok(())
     }
 
-    pub fn visit_block_stmt(&mut self, stmt: Block) {
+    pub fn visit_block_stmt(
+        &mut self,
+        stmt: Block,
+    ) -> Result<(), RuntimeError> {
         let scope =
             Environment::with_enclosing(Rc::clone(&self.environment));
         self.execute_block_stmt(
             stmt.statements,
             Rc::new(RefCell::new(scope)),
-        );
+        )
     }
 
-    pub fn visit_variable_expr(&self, variable: Token) -> Literal {
+    pub fn visit_variable_expr(
+        &self,
+        variable: Token,
+    ) -> Result<Literal, RuntimeError> {
         self.environment.borrow().get(&variable)
     }
 
-    pub fn visit_literal_expr(&self, expr: ExprLiteral) -> Literal {
-        expr.value
+    pub fn visit_literal_expr(
+        &self,
+        expr: ExprLiteral,
+    ) -> Result<Literal, RuntimeError> {
+        Ok(expr.value)
     }
 
-    pub fn visit_grouping_expr(&mut self, expr: Grouping) -> Literal {
+    pub fn visit_grouping_expr(
+        &mut self,
+        expr: Grouping,
+    ) -> Result<Literal, RuntimeError> {
         self.evaluate(*expr.expression)
     }
 
-    pub fn visit_assign_expr(&mut self, expr: Assignment) -> Literal {
-        let value = self.evaluate(*expr.value);
+    pub fn visit_assign_expr(
+        &mut self,
+        expr: Assignment,
+    ) -> Result<Literal, RuntimeError> {
+        let value = self.evaluate(*expr.value)?;
         self.environment
             .borrow_mut()
-            .assign(expr.token, value.clone());
-        value
+            .assign(&expr.name, value.clone())?;
+        Ok(value)
     }
 
-    pub fn visit_logical_expr(&mut self, expr: Logical) -> Literal {
-        let left = self.evaluate(*expr.left);
+    pub fn visit_logical_expr(
+        &mut self,
+        expr: Logical,
+    ) -> Result<Literal, RuntimeError> {
+        let left = self.evaluate(*expr.left)?;
 
         if expr.operator.token_type == TokenType::Or {
+            // `or` short-circuits when the left side is truthy.
             if self.is_truthy(&left) {
-                return left;
-            } else {
-                if !self.is_truthy(&left) {
-                    return left;
-                }
+                return Ok(left);
+            }
+        } else {
+            // `and` short-circuits when the left side is falsey.
+            if !self.is_truthy(&left) {
+                return Ok(left);
             }
         }
 
         self.evaluate(*expr.right)
     }
 
-    pub fn visit_unary_expr(&mut self, expr: Unary) -> Literal {
-        let right = self.evaluate(*expr.right);
+    pub fn visit_unary_expr(
+        &mut self,
+        expr: Unary,
+    ) -> Result<Literal, RuntimeError> {
+        let right = self.evaluate(*expr.right)?;
 
         match expr.operator.token_type {
-            TokenType::Minus => match right {
-                Literal::Number(n) => Literal::Number(-n),
-                _ => Literal::Null,
-            },
-            TokenType::Bang => {
-                let b = !self.is_truthy(&right);
-                Literal::Bool(b)
+            TokenType::Minus => {
+                let n = self.number_operand(&expr.operator, &right)?;
+                Ok(Literal::Number(-n))
             }
-            _ => Literal::Null,
+            TokenType::Bang => {
+                Ok(Literal::Bool(!self.is_truthy(&right)))
+            }
+            _ => Ok(Literal::Null),
         }
     }
 
-    pub fn visit_binary_expr(&mut self, expr: Binary) -> Literal {
-        let left = self.evaluate(*expr.left);
-        let right = self.evaluate(*expr.right);
+    pub fn visit_binary_expr(
+        &mut self,
+        expr: Binary,
+    ) -> Result<Literal, RuntimeError> {
+        let left = self.evaluate(*expr.left)?;
+        let right = self.evaluate(*expr.right)?;
+        let operator = &expr.operator;
 
-        match left {
-            Literal::Number(l) => match right {
-                Literal::Number(r) => {
-                    match expr.operator.token_type {
-                        TokenType::Minus => Literal::Number(l - r),
-                        TokenType::Slash => Literal::Number(l / r),
-                        TokenType::Star => Literal::Number(l * r),
-                        TokenType::Plus => Literal::Number(l + r),
-                        TokenType::BangEqual => Literal::Bool(
-                            !self.is_equal(&left, &right),
-                        ),
-                        TokenType::EqualEqual => Literal::Bool(
-                            self.is_equal(&left, &right),
-                        ),
-                        TokenType::Greater => Literal::Bool(l > r),
-                        TokenType::GreaterEqual => {
-                            Literal::Bool(l >= r)
-                        }
-                        TokenType::Less => Literal::Bool(l < r),
-                        TokenType::LessEqual => Literal::Bool(l <= r),
-                        _ => Literal::Null,
-                    }
+        match operator.token_type {
+            // Equality works across any operand types.
+            TokenType::BangEqual => {
+                Ok(Literal::Bool(!self.is_equal(&left, &right)))
+            }
+            TokenType::EqualEqual => {
+                Ok(Literal::Bool(self.is_equal(&left, &right)))
+            }
+
+            // `+` is overloaded: add numbers or concatenate strings.
+            TokenType::Plus => match (&left, &right) {
+                (Literal::Number(l), Literal::Number(r)) => {
+                    Ok(Literal::Number(l + r))
                 }
-                _ => Literal::Null,
-            },
-            Literal::String(l) => match right {
-                Literal::String(r) => {
-                    match expr.operator.token_type {
-                        TokenType::Plus => {
-                            Literal::String(l + r.as_str())
-                        }
-                        _ => Literal::Null,
-                    }
+                (Literal::String(l), Literal::String(r)) => {
+                    Ok(Literal::String(format!("{l}{r}")))
                 }
-                _ => Literal::Null,
+                _ => Err(RuntimeError::new(
+                    operator.clone(),
+                    "Operands must be two numbers or two strings.",
+                )),
             },
-            _ => Literal::Null,
+
+            // Everything else requires two numbers.
+            _ => {
+                let (l, r) =
+                    self.number_operands(operator, &left, &right)?;
+                match operator.token_type {
+                    TokenType::Minus => Ok(Literal::Number(l - r)),
+                    TokenType::Slash => Ok(Literal::Number(l / r)),
+                    TokenType::Star => Ok(Literal::Number(l * r)),
+                    TokenType::Greater => Ok(Literal::Bool(l > r)),
+                    TokenType::GreaterEqual => {
+                        Ok(Literal::Bool(l >= r))
+                    }
+                    TokenType::Less => Ok(Literal::Bool(l < r)),
+                    TokenType::LessEqual => Ok(Literal::Bool(l <= r)),
+                    _ => Ok(Literal::Null),
+                }
+            }
+        }
+    }
+
+    /// Checks a single operand is a number, mirroring jlox's
+    /// `checkNumberOperand`.
+    fn number_operand(
+        &self,
+        operator: &Token,
+        operand: &Literal,
+    ) -> Result<f64, RuntimeError> {
+        match operand {
+            Literal::Number(n) => Ok(*n),
+            _ => Err(RuntimeError::new(
+                operator.clone(),
+                "Operand must be a number.",
+            )),
+        }
+    }
+
+    /// Checks both operands are numbers (`checkNumberOperands`).
+    fn number_operands(
+        &self,
+        operator: &Token,
+        left: &Literal,
+        right: &Literal,
+    ) -> Result<(f64, f64), RuntimeError> {
+        match (left, right) {
+            (Literal::Number(l), Literal::Number(r)) => Ok((*l, *r)),
+            _ => Err(RuntimeError::new(
+                operator.clone(),
+                "Operands must be numbers.",
+            )),
         }
     }
 

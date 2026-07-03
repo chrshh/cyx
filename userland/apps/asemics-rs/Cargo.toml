@@ -1,0 +1,10 @@
+[package]
+name = "asemics-rs"
+version = "0.1.0"
+edition = "2024"
+
+# standalone crate: keeps the parent userland workspace from absorbing this app
+[workspace]
+
+[dependencies]
+libc = "0.2"

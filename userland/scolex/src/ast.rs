@@ -1,4 +1,4 @@
-use crate::{Token, token::Literal};
+use crate::Token;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ExprLiteral {
@@ -27,7 +27,7 @@ pub struct Unary {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Assignment {
-    pub token: String,
+    pub name: Token,
     pub value: Box<Expr>,
 }
 

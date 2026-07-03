@@ -1,4 +1,34 @@
-use crate::{ast::Expr, token::Literal};
+use crate::{ast::Expr, parser::Stmt, token::Literal};
+
+/// Pretty-prints a statement as an s-expression, recursing into nested
+/// statements and delegating expressions to [`print`]. Used by the `-d`
+/// debug flag to dump the parsed program.
+pub fn print_stmt(stmt: &Stmt) -> String {
+    match stmt {
+        Stmt::Expression(e) => print(e),
+        Stmt::Print(e) => format!("(print {})", print(e)),
+        Stmt::Var { name, initializer } => {
+            format!("(var {} {})", name.lexeme, print(initializer))
+        }
+        Stmt::Block(block) => {
+            let inner: Vec<String> =
+                block.statements.iter().map(print_stmt).collect();
+            format!("(block {})", inner.join(" "))
+        }
+        Stmt::If(i) => format!(
+            "(if {} {} {})",
+            print(&i.condition),
+            print_stmt(&i.then_branch.borrow()),
+            print_stmt(&i.else_branch.borrow()),
+        ),
+        Stmt::While(w) => format!(
+            "(while {} {})",
+            print(&w.condition),
+            print_stmt(&w.body.borrow()),
+        ),
+        Stmt::Null => "nil".to_string(),
+    }
+}
 
 /// Pretty-prints an expression tree as a Lisp-style s-expression,
 /// e.g. `(* (- 123) (group 45.67))`. Every node is wrapped in parens
@@ -19,7 +49,7 @@ pub fn print(expr: &Expr) -> String {
         Expr::Literal(l) => literal(&l.value),
         Expr::Variable(name) => name.lexeme.clone(),
         Expr::Assignment(a) => {
-            format!("(= {} {})", a.token, print(&a.value))
+            format!("(= {} {})", a.name.lexeme, print(&a.value))
         }
         Expr::Null => "nil".to_string(),
     }
