@@ -21,6 +21,10 @@ USERLAND = SCRIPT_DIR.parents[1]                          # userland (workspace 
 REPO_ROOT = SCRIPT_DIR.parents[2]                         # repo root
 BUILD_DIR = REPO_ROOT / "build"
 TARGET_DIR = BUILD_DIR / "palmer-target"
+# Shared, persistent cargo registry cache (crate downloads + index), mounted
+# into the build container so deps are fetched once and only re-downloaded when
+# Cargo.lock changes — instead of every `--rm` run starting from empty.
+CACHE_DIR = BUILD_DIR / "cargo-registry"
 IMAGE_TAG = "cjyx-palmer-builder"
 
 
@@ -35,9 +39,11 @@ def main() -> int:
     args = ap.parse_args()
 
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     run([
         "docker", "build",
+        "--platform", "linux/arm64",
         "-t", IMAGE_TAG,
         "-f", str(SCRIPT_DIR / "Dockerfile.build"),
         str(SCRIPT_DIR),
@@ -45,8 +51,10 @@ def main() -> int:
 
     run([
         "docker", "run", "--rm",
+        "--platform", "linux/arm64",
         "-v", f"{USERLAND}:/work",
         "-v", f"{TARGET_DIR}:/target",
+        "-v", f"{CACHE_DIR}:/usr/local/cargo/registry",
         "-e", "CARGO_TARGET_DIR=/target",
         "-w", "/work",
         IMAGE_TAG,

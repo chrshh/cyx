@@ -3,22 +3,29 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-CC = gcc
+# init is the guest PID 1 — it must be an aarch64 binary. Cross-compile it on
+# the host with the aarch64-linux-gnu toolchain (override CROSS_COMPILE to match
+# whatever prefix your distro ships). Static so it has no runtime lib deps.
+CROSS_COMPILE ?= aarch64-linux-gnu-
+CC = $(CROSS_COMPILE)gcc
 CFLAGS = -Wall -Wextra -Wpedantic -O2 $(EXTRA_FLAGS)
 
 ROOTFS  := rootfs
 DEBIAN  := ../build/debian-rootfs
+# Marker touched by the top-level Makefile every time the Debian rootfs is
+# re-exported. .staged depends on it so a refreshed export (e.g. an arch change)
+# forces a full re-extract instead of layering new binaries onto a stale base.
+DEBIAN_MARKER := ../build/.debian_rootfs
 CJSH    := ../build/cjsh
 DISPLAY := ../build/display
 SQUISHY := ../build/squishy
-ASEMICS   := ../build/asemics
 DINKY   := ../build/dinky
-PALMER  := ../build/palmer
 CMDDIR  := ../build/cmd
 CMDRSDIR := ../build/cmd-rs
 IMAGE   := ../build/disk.img
-# 12G: Mesa + GTK + Qt + Xwayland + fonts + Debian baseline runs ~2.5GB
-# extracted; ext4 overhead + headroom for /home growth + apps you'll write.
+# 12G: Mesa (llvmpipe + v3d/vc4) + Xwayland + fonts + Debian baseline, plus
+# ext4 overhead and headroom for /home growth + apps you'll write. GTK/Qt/foot
+# were dropped, so the extracted rootfs is well under the old ~2.5GB.
 SIZE    := 12G
 
 # The list of Debian core utilities to assassinate. 
@@ -32,11 +39,12 @@ init: cinit.c
 
 # Layered staging: Debian userland goes down first as the base, then our own
 # binaries and config files overlay on top. 
-rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display $(ROOTFS)/bin/squishy $(ROOTFS)/bin/asemics $(ROOTFS)/bin/dinky $(ROOTFS)/bin/palmer stage-cmd stage-cmd-rs $(ROOTFS)/etc/passwd
+rootfs: $(ROOTFS)/.staged $(ROOTFS)/init $(ROOTFS)/bin/cjsh $(ROOTFS)/bin/display $(ROOTFS)/bin/squishy $(ROOTFS)/bin/dinky stage-cmd stage-cmd-rs $(ROOTFS)/etc/passwd
 	mkdir -p $(ROOTFS)/dev $(ROOTFS)/proc $(ROOTFS)/sys $(ROOTFS)/tmp $(ROOTFS)/root $(ROOTFS)/home $(ROOTFS)/run
 
-# The marker file ensures we only extract and purge once. 
-$(ROOTFS)/.staged:
+# Re-extract whenever the Debian export is refreshed (marker is newer),
+# otherwise the staged base is reused as-is.
+$(ROOTFS)/.staged: $(DEBIAN_MARKER)
 	rm -rf $(ROOTFS)
 	mkdir -p $(ROOTFS)
 	cp -a $(DEBIAN)/. $(ROOTFS)/
@@ -75,15 +83,13 @@ $(ROOTFS)/bin/display: $(DISPLAY) $(ROOTFS)/.staged
 $(ROOTFS)/bin/squishy: $(SQUISHY) $(ROOTFS)/.staged
 	install -D -m 755 $(SQUISHY) $(ROOTFS)/bin/squishy
 
-$(ROOTFS)/bin/asemics: $(ASEMICS) $(ROOTFS)/.staged
-	install -D -m 755 $(ASEMICS) $(ROOTFS)/bin/asemics
-	ln -sf asemics $(ROOTFS)/bin/ase
+# asemics is a Rust workspace member — installed by stage-cmd-rs below (which
+# also creates the `ase` alias), not by a dedicated rule.
 
 $(ROOTFS)/bin/dinky: $(DINKY) $(ROOTFS)/.staged
 	install -D -m 755 $(DINKY) $(ROOTFS)/bin/dinky
 
-$(ROOTFS)/bin/palmer: $(PALMER) $(ROOTFS)/.staged
-	install -D -m 755 $(PALMER) $(ROOTFS)/bin/palmer
+# palmer is a Rust workspace member — installed by stage-cmd-rs, not a rule here.
 
 $(ROOTFS)/etc/passwd: etc/passwd etc/group etc/hostname $(ROOTFS)/.staged
 	mkdir -p $(ROOTFS)/etc
@@ -108,12 +114,18 @@ stage-cmd-rs: $(ROOTFS)/.staged
 		for f in $(CMDRSDIR)/*; do \
 			[ -f "$$f" ] && [ -x "$$f" ] && install -m 755 "$$f" $(ROOTFS)/bin/; \
 		done; \
+		if [ -x $(ROOTFS)/bin/asemics ]; then ln -sf asemics $(ROOTFS)/bin/ase; fi; \
 	fi
 
 image: rootfs
 	mkdir -p ../build
 	truncate -s $(SIZE) $(IMAGE)
-	mkfs.ext4 -F -q -d $(ROOTFS) $(IMAGE)
+	# -O ^metadata_csum: mkfs's directory pre-population (-d) doesn't reserve
+	# room for per-directory-leaf checksums, so with metadata_csum the guest
+	# kernel throws "No space for directory leaf checksum" and errors the fs on
+	# first read. Disabling it sidesteps the whole class (fine for a rebuilt
+	# appliance image).
+	mkfs.ext4 -F -q -O ^metadata_csum -d $(ROOTFS) $(IMAGE)
 
 clean:
 	rm -f init $(IMAGE)

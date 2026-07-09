@@ -61,6 +61,11 @@ int main(void) {
   mount("tmpfs", "/run", "tmpfs", 0, NULL);
   mkdir("/run/user", 0755);
   mkdir("/run/user/0", 0700);
+  // Persistent /home. Under QEMU there's a second virtio disk (/dev/vdb) holding
+  // a data image that survives root-image rebuilds — mount it over /home so
+  // files persist across `make run`. On the real Pi there's no second disk, so
+  // this mount fails harmlessly (ENOENT) and /home stays on the SD root, which
+  // persists across reboots on its own. Return value is intentionally ignored.
   mount("/dev/vdb", "/home", "ext4", 0, NULL);
   chdir("/home");
 
@@ -71,11 +76,13 @@ int main(void) {
   //   GDK_BACKEND — force GTK to use Wayland (default would try X first)
   //   QT_QPA_*    — force Qt to Wayland; otherwise Qt asks XCB for X11
   //   SDL_*       — SDL2 apps (raylib's audio uses SDL on some builds)
-  //   LIBGL_*     — Mesa: no virgl/host-GPU passthrough on virtio-gpu-pci,
-  //                 so force the llvmpipe software rasterizer
-  //   WLR_*       — wlroots quirks left over from simpledrm experiments;
-  //                 with virtio-gpu-pci we *could* drop these, but they're
-  //                 harmless and keep the compositor predictable
+  //   LIBGL_*     — Mesa: software-render first. Under QEMU `-M virt` there's
+  //                 no host-GPU passthrough; on the real Pi 4 the VideoCore VI
+  //                 (v3d/vc4) exists but we render via llvmpipe for bring-up.
+  //                 >>> To enable the real Pi GPU later, drop LIBGL_ALWAYS_
+  //                 SOFTWARE / GALLIUM_DRIVER / WLR_RENDERER here. <<<
+  //   WLR_*       — force wlroots' pixman (software) renderer to match the
+  //                 above; drop alongside the LIBGL_ vars when moving to v3d
   //   LIBSEAT_BACKEND is intentionally unset: seatd-launch sets SEATD_SOCK
   //                 and libseat auto-selects the seatd backend.
   setenv("XDG_RUNTIME_DIR", "/run/user/0", 1);
@@ -97,21 +104,35 @@ int main(void) {
   setenv("LANG", "en_US.UTF-8", 1);
   setenv("SHELL", "/bin/cjsh", 1);
 
+  // Start the udev daemon. It's long-running, so don't wait on it here.
   if (fork() == 0) {
     char *argv[] = {"/lib/systemd/systemd-udevd", NULL};
     execvp(argv[0], argv);
     perror("udevd failed to start");
     exit(1);
   }
-  sleep(1);
 
-  if (fork() == 0) {
-    char *argv[] = {"/usr/bin/udevadm", "trigger", "-c", "add", NULL};
-    execvp(argv[0], argv);
-    perror("udevadm trigger failed");
-    exit(1);
+  // Coldplug: replay "add" uevents for devices that already exist, then block
+  // until udev has drained its queue. `udevadm settle` replaces the old fixed
+  // sleep(1) pair — it returns the instant processing finishes instead of
+  // always burning a wall-clock second per step.
+  {
+    pid_t p;
+    if ((p = fork()) == 0) {
+      char *argv[] = {"/usr/bin/udevadm", "trigger", "-c", "add", NULL};
+      execvp(argv[0], argv);
+      perror("udevadm trigger failed");
+      _exit(1);
+    }
+    waitpid(p, NULL, 0);
+    if ((p = fork()) == 0) {
+      char *argv[] = {"/usr/bin/udevadm", "settle", NULL};
+      execvp(argv[0], argv);
+      perror("udevadm settle failed");
+      _exit(1);
+    }
+    waitpid(p, NULL, 0);
   }
-  sleep(1);
 
   /**
    * @brief Opens the console and allocates file descriptors

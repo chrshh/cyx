@@ -28,6 +28,10 @@ USERLAND = SCRIPT_DIR.parent                              # userland (workspace 
 REPO_ROOT = USERLAND.parent                              # repo root
 BUILD_DIR = REPO_ROOT / "build"
 TARGET_DIR = BUILD_DIR / "cmd-rs-target"
+# Shared, persistent cargo registry cache (crate downloads + index), mounted
+# into the build container so deps are fetched once and only re-downloaded when
+# Cargo.lock changes — instead of every `--rm` run starting from empty.
+CACHE_DIR = BUILD_DIR / "cargo-registry"
 IMAGE_TAG = "cjyx-cmd-rs-builder"
 
 
@@ -67,9 +71,11 @@ def main() -> int:
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     run([
         "docker", "build",
+        "--platform", "linux/arm64",
         "-t", IMAGE_TAG,
         "-f", str(SCRIPT_DIR / "Dockerfile.rust"),
         str(SCRIPT_DIR),
@@ -77,8 +83,10 @@ def main() -> int:
 
     run([
         "docker", "run", "--rm",
+        "--platform", "linux/arm64",
         "-v", f"{USERLAND}:/work",
         "-v", f"{TARGET_DIR}:/target",
+        "-v", f"{CACHE_DIR}:/usr/local/cargo/registry",
         "-e", "CARGO_TARGET_DIR=/target",
         "-w", "/work",
         IMAGE_TAG,

@@ -31,6 +31,9 @@ pub fn print_stmt(stmt: &Stmt) -> String {
                 f.body.iter().map(print_stmt).collect();
             format!("(fn {} {})", f.name.lexeme, body.join(" "))
         }
+        Stmt::Return(r) => {
+            format!("(return {})", print(&r.value))
+        }
         Stmt::Null => "nil".to_string(),
     }
 }

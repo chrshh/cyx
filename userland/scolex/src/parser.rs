@@ -616,7 +616,7 @@ impl Parser {
         self.consume(
             TokenType::Semicolon,
             "Expect ';' after return value.",
-        );
+        )?;
         Ok(Stmt::Return(Return {
             keyword,
             value: Box::new(value),

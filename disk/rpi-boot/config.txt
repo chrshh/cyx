@@ -1,0 +1,17 @@
+# Raspberry Pi 4 (BCM2711) VideoCore firmware config.
+# Read by start4.elf from the FAT boot partition before the ARM cores start.
+
+# Boot the 64-bit kernel in AArch64 state.
+arm_64bit=1
+
+# Our mainline arm64 kernel, shipped on this partition as "Image".
+kernel=Image
+
+# Force the device tree we ship here (mainline Pi 4 DT; enables vc4/HDMI).
+device_tree=bcm2711-rpi-4-b.dtb
+
+# Serial console on the GPIO PL011 UART (115200 8N1) for headless bring-up.
+enable_uart=1
+
+# Skip the rainbow splash to shave a little off boot.
+disable_splash=1
