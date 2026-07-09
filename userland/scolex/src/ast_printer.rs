@@ -1,8 +1,8 @@
 use crate::{ast::Expr, parser::Stmt, token::Literal};
 
-/// Pretty-prints a statement as an s-expression, recursing into nested
-/// statements and delegating expressions to [`print`]. Used by the `-d`
-/// debug flag to dump the parsed program.
+/// Pretty-prints a statement as an s-expression, recursing into
+/// nested statements and delegating expressions to [`print`]. Used by
+/// the `-d` debug flag to dump the parsed program.
 pub fn print_stmt(stmt: &Stmt) -> String {
     match stmt {
         Stmt::Expression(e) => print(e),
@@ -26,6 +26,11 @@ pub fn print_stmt(stmt: &Stmt) -> String {
             print(&w.condition),
             print_stmt(&w.body.borrow()),
         ),
+        Stmt::Function(f) => {
+            let body: Vec<String> =
+                f.body.iter().map(print_stmt).collect();
+            format!("(fn {} {})", f.name.lexeme, body.join(" "))
+        }
         Stmt::Null => "nil".to_string(),
     }
 }
@@ -51,6 +56,7 @@ pub fn print(expr: &Expr) -> String {
         Expr::Assignment(a) => {
             format!("(= {} {})", a.name.lexeme, print(&a.value))
         }
+        Expr::Call(_) => "fn".to_string(),
         Expr::Null => "nil".to_string(),
     }
 }
@@ -62,6 +68,7 @@ fn literal(value: &Literal) -> String {
         Literal::Number(n) => n.to_string(),
         Literal::String(s) => format!("\"{s}\""),
         Literal::Bool(b) => b.to_string(),
+        Literal::Func(func) => format!("\"{:?}\"", func),
         Literal::Null => "nil".to_string(),
     }
 }

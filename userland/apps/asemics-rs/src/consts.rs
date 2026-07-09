@@ -40,7 +40,6 @@ pub const KEYWORD1: &str = "\x1b[31m";
 pub const KEYWORD2: &str = "\x1b[31m";
 pub const DEF_COLOR: &str = "\x1b[39m";
 pub const COMMENT: &str = "\x1b[90m";
-pub const MLCOMMENT: &str = "\x1b[90m";
 pub const MATCH: &str = "\x1b[35m";
 pub const OPERATOR: &str = BLUE;
 pub const RESET_FG: &str = "\x1b[39m";

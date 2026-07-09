@@ -1,13 +1,13 @@
 use crate::consts::TAB_STOP;
 use crate::editor::Editor;
+use crate::syntax::HL_NORMAL;
 
 #[derive(Clone)]
 pub struct Row {
-    pub idx: i32,             /* this row's position in the buffer */
-    pub chars: Vec<u8>,       /* raw line text as stored in the file */
-    pub render: Vec<u8>,      /* line as drawn on screen (tabs expanded etc.) */
-    pub hl: Vec<u8>,          /* per-cell highlight codes, same length as `render` */
-    pub hl_open_comment: bool, /* true if this row ends inside an unclosed multi-line comment */
+    pub idx: i32,       /* this row's position in the buffer */
+    pub chars: Vec<u8>, /* raw line text as stored in the file */
+    pub render: Vec<u8>, /* line as drawn on screen (tabs expanded etc.) */
+    pub hl: Vec<u8>,    /* per-cell highlight codes, same length as `render` */
 }
 
 impl Row {
@@ -61,7 +61,6 @@ impl Editor {
             chars: s.to_vec(),
             render: Vec::new(),
             hl: Vec::new(),
-            hl_open_comment: false,
         };
         self.buffer.rows.insert(pos as usize, row);
         for j in (pos + 1) as usize..self.buffer.rows.len() {
@@ -102,9 +101,12 @@ impl Editor {
                 render.push(c);
             }
         }
+        /* keep hl sized with render so drawing stays in bounds; the real
+         * colors land on the next refresh via rehighlight() */
+        row.hl = vec![HL_NORMAL; render.len()];
         row.render = render;
 
-        self.update_syntax(idx);
+        self.hl_dirty = true;
     }
 
     pub fn row_insert_char(&mut self, idx: i32, pos: i32, c: i32) {
@@ -136,6 +138,7 @@ impl Editor {
         }
         self.buffer.num_rows -= 1;
         self.buffer.dirty = true;
+        self.hl_dirty = true;
     }
 
     pub fn row_del_char(&mut self, idx: i32, pos: i32) {

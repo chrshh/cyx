@@ -346,7 +346,7 @@ static KEYWORDS: LazyLock<HashMap<&'static str, TokenType>> =
             ("class", TokenType::Class),
             ("else", TokenType::Else),
             ("false", TokenType::False),
-            ("fun", TokenType::Fun),
+            ("fn", TokenType::Fn),
             ("for", TokenType::For),
             ("if", TokenType::If),
             ("NULL", TokenType::Null),

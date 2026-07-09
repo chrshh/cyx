@@ -39,11 +39,19 @@ pub struct Logical {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Call {
+    pub callee: Box<Expr>,
+    pub paren: Token,
+    pub arguments: Vec<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Binary(Binary),
     Grouping(Grouping),
     Literal(ExprLiteral),
     Logical(Logical),
+    Call(Call),
     Unary(Unary),
     Variable(Token),
     Assignment(Assignment),

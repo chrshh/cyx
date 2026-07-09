@@ -4,6 +4,7 @@ mod dbg;
 mod editor;
 mod history;
 mod input;
+mod lsp;
 mod motions;
 mod palmer;
 mod rows;

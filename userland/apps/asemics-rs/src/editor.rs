@@ -6,9 +6,10 @@ use std::time::SystemTime;
 use crate::consts::*;
 use crate::dbg::init_dbg;
 use crate::history::History;
-use crate::input::{read_key, BACKSPACE, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, ARROW_UP};
+use crate::input::{BACKSPACE, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, ARROW_UP};
+use crate::lsp::LspClient;
 use crate::rows::Row;
-use crate::syntax::{syntax_to_color, EditorSyntax, HL_NORMAL};
+use crate::syntax::{syntax_to_color, EditorSyntax, TsHighlighter, HL_NORMAL};
 use crate::terminal::{die, exit_restore, get_window_size, strerror_last, write_stdout};
 
 /* global state */
@@ -36,8 +37,8 @@ pub struct Viewport {
 
 pub struct Buffer {
     pub rows: Vec<Row>, /* the document contents */
-    /* kept separately from rows.len(): the C code bumps num_rows only after the
-     * syntax update runs during a row insert, and comment propagation reads it */
+    /* kept separately from rows.len(): mirrors the C editor, which bumps
+     * num_rows only at the end of a row insert */
     pub num_rows: i32,
     pub dirty: bool,              /* true if there are unsaved changes */
     pub filename: Option<String>, /* path to the open file (None when unnamed) */
@@ -62,7 +63,10 @@ pub struct Editor {
     pub viewport: Viewport,                    /* what slice of the buffer is visible */
     pub buffer: Buffer,                        /* the document being edited */
     pub ui: StatusBar,                         /* bottom-bar state: status message + command line */
-    pub syntax: Option<&'static EditorSyntax>, /* active syntax-highlight rules (None = none) */
+    pub syntax: Option<&'static EditorSyntax>, /* active filetype entry (None = none) */
+    pub ts: Option<TsHighlighter>,             /* tree-sitter parser + query for the filetype */
+    pub hl_dirty: bool,                        /* buffer changed; rehighlight on next refresh */
+    pub lsp: Option<LspClient>,                /* language server for the filetype */
     pub history: History,
     pub dbg: fs::File,
 }
@@ -108,6 +112,9 @@ impl Editor {
                 cmdline: Vec::new(),
             },
             syntax: None,
+            ts: None,
+            hl_dirty: false,
+            lsp: None,
             history: History::new(),
             dbg,
         }
@@ -247,6 +254,11 @@ impl Editor {
     }
 
     pub fn refresh_screen(&mut self) {
+        if self.hl_dirty {
+            self.rehighlight();
+            self.lsp_sync();
+            self.hl_dirty = false;
+        }
         self.scroll();
         let mut wb: Vec<u8> = Vec::new();
 
@@ -369,6 +381,8 @@ impl Editor {
             self.insert_row(self.buffer.num_rows, line);
         }
         self.buffer.dirty = false;
+
+        self.lsp_start();
     }
 
     /* y = 0: top of file  */
@@ -430,6 +444,9 @@ impl Editor {
                     self.ui.cmdline.clear();
                     self.set_status_msg(format!("{}: bytes written to disk", len));
                     self.set_syntax_highlight();
+                    if let Some(lsp) = self.lsp.as_mut() {
+                        lsp.did_save();
+                    }
                     return;
                 }
                 self.set_syntax_highlight();
@@ -471,7 +488,7 @@ impl Editor {
             self.set_status_msg(shown);
             self.refresh_screen();
 
-            let c = read_key();
+            let c = self.read_key();
             if c == BACKSPACE {
                 if !buf.is_empty() {
                     buf.pop();

@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use crate::consts::{LINE_NUM_RESERVE, SCREEN_CLEAR_LINE};
+use crate::consts::{DEF_COLOR, KEYWORD1, LINE_NUM_RESERVE, SCREEN_CLEAR_LINE};
 use crate::editor::{Editor, EditorMode};
 
 impl Editor {
@@ -25,12 +25,17 @@ impl Editor {
             if self.buffer.dirty { "*" } else { "" }
         );
 
-        let rstatus = format!(
+        let mut rstatus = format!(
             "{} | {}/{}",
             self.syntax.map_or("no ft", |s| s.filetype),
             self.cursor.y + 1,
             self.buffer.num_rows
         );
+        if let Some(lsp) = &self.lsp {
+            let errs = lsp.diagnostics.iter().filter(|d| d.severity == 1).count();
+            let warns = lsp.diagnostics.iter().filter(|d| d.severity == 2).count();
+            rstatus = format!("E:{} W:{} | {}", errs, warns, rstatus);
+        }
 
         let mut modelen = mdstatus.len() as i32;
         let mut statuslen = status.len() as i32;
@@ -80,6 +85,31 @@ impl Editor {
         let recent = self.ui.msg_time.elapsed().is_ok_and(|d| d.as_secs() < 5);
         if msglen > 0 && recent {
             wb.extend_from_slice(&self.ui.msg[..msglen as usize]);
+            return;
         }
+
+        /* no transient message: surface the first diagnostic on the cursor
+         * line so errors are visible where the user is working */
+        let Some(lsp) = &self.lsp else { return };
+        let Some(diag) = lsp.diagnostics.iter().find(|d| d.line == self.cursor.y) else {
+            return;
+        };
+
+        let sev = match diag.severity {
+            1 => "E",
+            2 => "W",
+            3 => "I",
+            _ => "H",
+        };
+        /* diagnostics can be multi-line; keep the first line only */
+        let first_line = diag.message.lines().next().unwrap_or("");
+        let mut msg = format!("{}: {}", sev, first_line).into_bytes();
+        msg.truncate(self.viewport.width as usize);
+
+        if diag.severity == 1 {
+            wb.extend_from_slice(KEYWORD1.as_bytes()); /* errors in red */
+        }
+        wb.extend_from_slice(&msg);
+        wb.extend_from_slice(DEF_COLOR.as_bytes());
     }
 }

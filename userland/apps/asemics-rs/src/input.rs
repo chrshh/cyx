@@ -8,21 +8,31 @@ pub const ARROW_RIGHT: i32 = 1001;
 pub const ARROW_UP: i32 = 1002;
 pub const ARROW_DOWN: i32 = 1003;
 
-pub fn read_key() -> i32 {
-    let mut c: u8 = 0;
+impl Editor {
+    pub fn read_key(&mut self) -> i32 {
+        let mut c: u8 = 0;
 
-    loop {
-        let nread = unsafe { libc::read(libc::STDIN_FILENO, (&mut c as *mut u8).cast(), 1) };
-        if nread == 1 {
-            break;
+        loop {
+            let nread =
+                unsafe { libc::read(libc::STDIN_FILENO, (&mut c as *mut u8).cast(), 1) };
+            if nread == 1 {
+                break;
+            }
+            if nread == -1
+                && std::io::Error::last_os_error().raw_os_error() != Some(libc::EAGAIN)
+            {
+                die("read");
+            }
+            /* raw mode's VTIME wakes this loop every 100ms with no input;
+             * use the idle tick to drain language-server messages */
+            self.lsp_idle();
         }
-        if nread == -1
-            && std::io::Error::last_os_error().raw_os_error() != Some(libc::EAGAIN)
-        {
-            die("read");
-        }
+
+        parse_key(c)
     }
+}
 
+fn parse_key(c: u8) -> i32 {
     /* ESC sequences */
     if c == 0x1b {
         let mut seq = [0u8; 2];
@@ -54,7 +64,7 @@ pub fn read_key() -> i32 {
 
 impl Editor {
     pub fn process_key(&mut self) {
-        let c = read_key();
+        let c = self.read_key();
 
         match self.mode {
             EditorMode::Insert => self.handle_insert_mode_key(c),
@@ -104,7 +114,7 @@ impl Editor {
                 self.move_cursor(b'j' as i32);
             }
         } else if c == b'g' as i32 {
-            let d = read_key();
+            let d = self.read_key();
             if d == b'g' as i32 {
                 self.cursor.y = 0;
             }
@@ -221,11 +231,11 @@ impl Editor {
     }
 
     pub fn handle_leader_key(&mut self) {
-        let c = read_key();
+        let c = self.read_key();
 
         /* <leader>f? */
         if c == b'f' as i32 {
-            let f = read_key();
+            let f = self.read_key();
             if f == b'f' as i32 {
                 self.invoke_palmer(None);
             } else if f == b'F' as i32 {

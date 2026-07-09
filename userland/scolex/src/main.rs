@@ -5,9 +5,7 @@ use std::{
 };
 
 use crate::{
-    error::{
-        read_err_flag, read_runtime_err_flag, set_err_flag,
-    },
+    error::{read_err_flag, read_runtime_err_flag, set_err_flag},
     interpreter::Interpreter,
     parser::{Parser, Stmt},
     scanner::Scanner,
@@ -16,8 +14,10 @@ use crate::{
 
 mod ast;
 mod ast_printer;
+mod callable;
 mod environment;
 mod error;
+mod function;
 mod interpreter;
 mod parser;
 mod scanner;
@@ -31,8 +31,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     // `-d` / `--debug` dumps the token stream and parsed AST.
-    let debug =
-        args.iter().any(|a| a == "-d" || a == "--debug");
+    let debug = args.iter().any(|a| a == "-d" || a == "--debug");
     let scripts: Vec<&String> = args
         .iter()
         .skip(1)
@@ -54,7 +53,7 @@ fn run_file(path: &str, debug: bool) {
     let file = read_to_string(path).unwrap();
     run(&file, debug);
 
-    // 65: compile/syntax error. 70: runtime error. Mirrors jlox.
+    // 65: compile/syntax error. 70: runtime error.
     if read_err_flag() {
         exit(65);
     }

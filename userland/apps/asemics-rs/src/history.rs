@@ -64,6 +64,7 @@ impl Editor {
         self.buffer.rows[entry_cursor.y as usize] = entry_row;
         self.cursor = entry_cursor;
         self.history.curr_idx -= 1;
+        self.hl_dirty = true;
     }
 
     pub fn history_redo(&mut self) {
@@ -77,5 +78,6 @@ impl Editor {
         self.buffer.rows[entry_cursor.y as usize] = entry_row;
         self.cursor = entry_cursor;
         self.history.curr_idx += 1;
+        self.hl_dirty = true;
     }
 }

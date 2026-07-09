@@ -3,25 +3,34 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     Token,
     ast::{
-        Assignment, Binary, Expr, ExprLiteral, Grouping, Logical,
-        Unary,
+        Assignment, Binary, Call, Expr, ExprLiteral, Grouping,
+        Logical, Unary,
     },
+    callable::{CallableObject, Clock},
     environment::Environment,
     error::{self, RuntimeError},
-    parser::{Block, If, Stmt, While},
+    parser::{Block, Function, If, Return, Stmt, While},
     token::Literal,
     token_type::TokenType,
 };
 
 #[derive(Debug)]
 pub struct Interpreter {
+    pub globals: Rc<RefCell<Environment>>,
     pub environment: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let globals = Rc::new(RefCell::new(Environment::default()));
+        globals.borrow_mut().define(
+            "clock".to_string(),
+            Literal::Func(Clock::new_clock()),
+        );
+
         Self {
-            environment: Rc::new(RefCell::new(Environment::new())),
+            globals: Rc::clone(&globals),
+            environment: globals,
         }
     }
 
@@ -36,7 +45,10 @@ impl Interpreter {
         }
     }
 
-    pub fn execute(&mut self, stmt: Stmt) -> Result<(), RuntimeError> {
+    pub fn execute(
+        &mut self,
+        stmt: Stmt,
+    ) -> Result<(), RuntimeError> {
         match stmt {
             Stmt::Expression(expr) => {
                 self.visit_expression_stmt(expr)
@@ -52,6 +64,10 @@ impl Interpreter {
             Stmt::While(while_stmt) => {
                 self.visit_while_stmt(while_stmt)
             }
+            Stmt::Function(function) => {
+                self.visit_function_stmt(function)
+            }
+            Stmt::Return(r) => self.visit_return_stmt(r),
             Stmt::Null => Ok(()),
         }
     }
@@ -100,6 +116,7 @@ impl Interpreter {
             Expr::Assignment(assignment) => {
                 self.visit_assign_expr(assignment)
             }
+            Expr::Call(call) => self.visit_call_expr(call),
             Expr::Null => Ok(Literal::Null),
         }
     }
@@ -128,6 +145,32 @@ impl Interpreter {
     ) -> Result<(), RuntimeError> {
         let value = self.evaluate(initializer)?;
         self.environment.borrow_mut().define(name.lexeme, value);
+        Ok(())
+    }
+
+    pub fn visit_function_stmt(
+        &mut self,
+        function: Function,
+    ) -> Result<(), RuntimeError> {
+        let name = function.name.lexeme.clone();
+        let callable = CallableObject::new_function(function);
+        self.environment
+            .borrow_mut()
+            .define(name, Literal::Func(callable));
+        Ok(())
+    }
+
+    pub fn visit_return_stmt(
+        &mut self,
+        ret: Return,
+    ) -> Result<(), RuntimeError> {
+        let mut _val = Literal::Null;
+        if ret.value != Expr::Null.into() {
+            _val = self.evaluate(*ret.value)?;
+        }
+
+        // self.call_return(val);
+
         Ok(())
     }
 
@@ -172,6 +215,42 @@ impl Interpreter {
             stmt.statements,
             Rc::new(RefCell::new(scope)),
         )
+    }
+
+    pub fn visit_call_expr(
+        &mut self,
+        expr: Call,
+    ) -> Result<Literal, RuntimeError> {
+        let callee = self.evaluate(*expr.callee)?;
+
+        let mut arguments: Vec<Literal> = Vec::new();
+
+        for argument in expr.arguments {
+            arguments.push(self.evaluate(argument)?);
+        }
+
+        /* ensures callee implements Callable trait */
+        match callee {
+            Literal::Func(obj) => {
+                /* fires when expected args  != received args count */
+                if arguments.len() != obj.arity() {
+                    return Err(RuntimeError {
+                        token: expr.paren,
+                        message: format!(
+                            "Expected {} arguments but got {}.",
+                            obj.arity(),
+                            arguments.len()
+                        ),
+                    });
+                }
+                obj.call(self, arguments)
+            }
+            _ => Err(RuntimeError {
+                token: Token::default(),
+                message: "Can only call functions and classes"
+                    .to_string(),
+            }),
+        }
     }
 
     pub fn visit_variable_expr(
@@ -235,7 +314,8 @@ impl Interpreter {
 
         match expr.operator.token_type {
             TokenType::Minus => {
-                let n = self.number_operand(&expr.operator, &right)?;
+                let n =
+                    self.number_operand(&expr.operator, &right)?;
                 Ok(Literal::Number(-n))
             }
             TokenType::Bang => {

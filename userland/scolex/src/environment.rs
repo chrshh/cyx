@@ -16,13 +16,6 @@ impl Environment {
         }
     }
 
-    // pub fn from(e: Environment) -> Environment {
-    //     Environment {
-    //         enclosing: e.enclosing,
-    //         values: e.values,
-    //     }
-    // }
-
     pub fn with_enclosing(
         enclosing: Rc<RefCell<Environment>>,
     ) -> Environment {

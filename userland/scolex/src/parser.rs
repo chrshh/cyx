@@ -3,8 +3,8 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     Token,
     ast::{
-        Assignment, Binary, Expr, ExprLiteral, Grouping, Logical,
-        Unary,
+        Assignment, Binary, Call, Expr, ExprLiteral, Grouping,
+        Logical, Unary,
     },
     error as Scolex,
     token::Literal,
@@ -18,9 +18,9 @@ pub struct Parser {
 }
 
 /// A parse error. The error is already reported (via `Parser::error`)
-/// by the time this is returned; the value just unwinds parsing back to
-/// a statement boundary where `synchronize` can recover. Mirrors jlox's
-/// `ParseError` exception.
+/// by the time this is returned; the value just unwinds parsing back
+/// to a statement boundary where `synchronize` can recover. Mirrors
+/// jlox's `ParseError` exception.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseError;
 
@@ -36,10 +36,7 @@ impl Block {
         original: Stmt,
         additional: Stmt,
     ) -> Vec<Stmt> {
-        let mut v: Vec<Stmt> = Vec::new();
-        v.push(original);
-        v.push(additional);
-        v
+        vec![original, additional]
     }
 }
 
@@ -56,14 +53,33 @@ pub struct While {
     pub body: Rc<RefCell<Stmt>>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Function {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Return {
+    pub keyword: Token,
+    pub value: Box<Expr>,
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
-    Var { name: Token, initializer: Expr },
+    Return(Return),
+    Var {
+        name: Token,
+        initializer: Expr,
+    },
     Block(Block),
     If(If),
     While(While),
+    Function(Function),
+    #[default]
     Null,
 }
 
@@ -86,16 +102,24 @@ impl Parser {
     }
 
     pub fn declaration(&mut self) -> PResult<Stmt> {
-        if self.expr_matches(Vec::from([TokenType::Var])) {
+        if self.expr_matches(vec![TokenType::Fn]) {
+            return self.function("function".to_string());
+        }
+        if self.expr_matches(vec![TokenType::Var]) {
             return self.var_declaration();
+        }
+        if self.expr_matches(vec![TokenType::Return]) {
+            return self.return_statement();
         }
 
         self.statement()
     }
 
     pub fn var_declaration(&mut self) -> PResult<Stmt> {
-        let name = self
-            .consume(TokenType::Identifier, "Expect variable name.")?;
+        let name = self.consume(
+            TokenType::Identifier,
+            "Expect variable name.",
+        )?;
 
         let mut initializer = Expr::Null;
         if self.expr_matches(Vec::from([TokenType::Equal])) {
@@ -203,7 +227,51 @@ impl Parser {
             }));
         }
 
-        self.primary()
+        self.call()
+    }
+
+    pub fn call(&mut self) -> PResult<Expr> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.expr_matches(vec![TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    pub fn finish_call(&mut self, callee: Expr) -> PResult<Expr> {
+        let mut arguments: Vec<Expr> = Vec::new();
+
+        if !self.expr_check(TokenType::RightParen) {
+            loop {
+                if arguments.len() >= 255 {
+                    self.error(
+                        self.peek(),
+                        "Can't have more than 255 arguments.",
+                    );
+                }
+                arguments.push(self.expression()?);
+
+                if !self.expr_matches(vec![TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        let paren: Token = self.consume(
+            TokenType::RightParen,
+            "Expect ')' after arguments.",
+        )?;
+
+        Ok(Expr::Call(Call {
+            callee: Box::new(callee),
+            paren,
+            arguments,
+        }))
     }
 
     pub fn assignment(&mut self) -> PResult<Expr> {
@@ -221,8 +289,9 @@ impl Parser {
                         value: Box::new(value),
                     }));
                 }
-                // Report but don't unwind: jlox reports the bad target
-                // and keeps parsing from the already-parsed expression.
+                // Report but don't unwind: jlox reports the bad
+                // target and keeps parsing from the
+                // already-parsed expression.
                 _ => {
                     self.error(equals, "Invalid assignment target.");
                 }
@@ -343,7 +412,7 @@ impl Parser {
 
             match self.peek().token_type {
                 TokenType::Class
-                | TokenType::Fun
+                | TokenType::Fn
                 | TokenType::Var
                 | TokenType::For
                 | TokenType::If
@@ -503,10 +572,7 @@ impl Parser {
     }
 
     pub fn if_statement(&mut self) -> PResult<Stmt> {
-        self.consume(
-            TokenType::LeftParen,
-            "Expect '(' after 'if'.",
-        )?;
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
         let condition: Expr = self.expression()?;
         self.consume(
             TokenType::RightParen,
@@ -537,6 +603,73 @@ impl Parser {
             "Expect ';' after expression.",
         )?;
         Ok(Stmt::Expression(expr))
+    }
+
+    pub fn return_statement(&mut self) -> PResult<Stmt> {
+        let keyword = self.previous();
+
+        let mut value = Expr::Null;
+        if !self.expr_check(TokenType::Semicolon) {
+            value = self.expression()?;
+        }
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after return value.",
+        );
+        Ok(Stmt::Return(Return {
+            keyword,
+            value: Box::new(value),
+        }))
+    }
+
+    pub fn function(&mut self, kind: String) -> PResult<Stmt> {
+        let name = self
+            .consume(TokenType::Identifier, "Expect {kind} name.")?;
+
+        self.consume(
+            TokenType::LeftParen,
+            "Expect '(' after {kind} name.",
+        )?;
+
+        let mut parameters: Vec<Token> = Vec::new();
+
+        if !self.expr_check(TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    self.error(
+                        self.peek(),
+                        "Can't have more than 255 parameters",
+                    );
+                }
+
+                parameters.push(self.consume(
+                    TokenType::Identifier,
+                    "Expect parameter name.",
+                )?);
+
+                if !self.expr_matches(vec![TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(
+            TokenType::RightParen,
+            "Expect ')' after parameters.",
+        )?;
+
+        self.consume(
+            TokenType::LeftBrace,
+            format!("Expect '{{' before {kind} body.").as_str(),
+        )?;
+
+        let body = vec![self.block().unwrap_or_default()];
+        Ok(Stmt::Function(Function {
+            name,
+            params: parameters,
+            body,
+        }))
     }
 
     pub fn expr_check(&self, token_type: TokenType) -> bool {

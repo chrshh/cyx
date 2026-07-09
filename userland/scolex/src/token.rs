@@ -1,4 +1,4 @@
-use crate::token_type::TokenType;
+use crate::{callable::CallableObject, token_type::TokenType};
 
 pub struct Tokens<L>(pub Vec<GenericToken<L>>);
 
@@ -7,6 +7,7 @@ pub enum Literal {
     String(String),
     Number(f64),
     Bool(bool),
+    Func(CallableObject),
     #[default]
     Null, // null is reserved for identifiers / keywords
 }
@@ -17,6 +18,7 @@ impl Literal {
             Self::String(_) => "STRING",
             Self::Number(_) => "NUMBER",
             Self::Bool(_) => "BOOL",
+            Self::Func(_) => "FUNCTION",
             Self::Null => "NULL",
         }
     }
@@ -26,6 +28,7 @@ impl Literal {
             Self::String(_) => Self::String("NULL".to_string()),
             Self::Null => Self::Null,
             Self::Bool(_) => Self::Bool(true),
+            Self::Func(obj) => Self::Func(obj.clone()),
             Self::Number(_) => Self::Number(0 as f64),
         }
     }
@@ -38,6 +41,7 @@ impl std::fmt::Display for Literal {
             Literal::String(s) => write!(f, "{s}"),
             Literal::Number(n) => write!(f, "{n}"),
             Literal::Bool(b) => write!(f, "{b}"),
+            Literal::Func(func) => write!(f, "{:?}", func),
             Literal::Null => write!(f, "null"),
         }
     }
