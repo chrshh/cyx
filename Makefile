@@ -51,7 +51,7 @@ QEMU_HEADLESS := $(QEMU_COMMON) -nographic
 # virtio-gpu-pci gives wlroots a real DRM device (modesetting/GBM/atomic) under
 # `-M virt`; virtio-keyboard/tablet give the compositor input devices. The Pi's
 # own VideoCore is not emulated here — this path renders via llvmpipe.
-QEMU_GRAPHICAL := $(QEMU_COMMON) -display gtk -device virtio-gpu-pci \
+QEMU_GRAPHICAL := $(QEMU_COMMON) -display gtk,gl=on -device virtio-gpu-gl-pci \
   -device virtio-keyboard-pci -device virtio-tablet-pci
 # QEMU virt serial is ttyAMA0 (PL011), same as the Pi — so one cmdline works.
 ROOT_CMDLINE := root=/dev/vda rootfstype=ext4 rw console=ttyAMA0

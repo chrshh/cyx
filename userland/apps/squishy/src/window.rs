@@ -171,7 +171,7 @@ pub fn run() {
     while state.running {
         event_loop.dispatch(None, &mut state).expect("dispatch");
 
-        if state.needs_redraw {
+        if state.needs_redraw && !state.first_configure {
             state.draw(&qh);
             state.needs_redraw = false;
         }

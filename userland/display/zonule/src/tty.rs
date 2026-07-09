@@ -365,7 +365,7 @@ fn render_surface(space: &Space<Window>, start_time: Instant, backend: &mut Back
             eprintln!("zonule: queue_buffer failed: {err:?}");
             return;
         }
-        // backend.waiting_for_vblank = true;
+        backend.waiting_for_vblank = true;
     }
 
     // Let clients know they may draw their next frame.
