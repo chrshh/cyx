@@ -7,7 +7,7 @@ resolver = "2"
 # then list it here. Each crate produces one binary named after the crate;
 # cmd/build-rust.py harvests every release executable and installs it into
 # build/cmd-rs/ for the disk image, next to the C commands from build/cmd/.
-members = ["cmd/find", "cmd/grep", "apps/palmer", "scolex"]
+members = ["cmd/find", "cmd/grep", "apps/palmer", "apps/asemics", "scolex"]
 # The remaining GUI/TUI apps still build through their own per-app toolchain
 # images (different system deps). Excluding them keeps host-side `cargo` runs
 # inside an app dir from being absorbed into this workspace. palmer is a member
