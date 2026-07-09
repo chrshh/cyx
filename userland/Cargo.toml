@@ -13,7 +13,7 @@ members = ["cmd/find", "cmd/grep", "apps/palmer", "apps/asemics", "scolex"]
 # inside an app dir from being absorbed into this workspace. palmer is a member
 # (above) because it depends on the command crates as libraries — it shares
 # this lockfile and target dir.
-exclude = ["apps/squishy", "apps/dinky", "apps/yoink"]
+exclude = ["apps/squishy", "apps/dinky", "apps/yoink", "display/zonule"]
 
 [workspace.package]
 version = "0.1.0"

@@ -74,7 +74,6 @@ COPY cjhlib/ cjhlib/
 COPY libcjyx/ libcjyx/
 COPY cjsh/ cjsh/
 COPY cmd/ cmd/
-COPY display/ display/
 COPY Makefile .
 
 RUN make clean && make $BUILD_TARGET EXTRA_FLAGS="$EXTRA_FLAGS"
@@ -95,13 +94,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libegl1 \
     libgles2 \
     libgbm1 \
-    # Wayland client libs (server-side comes with libwlroots10)
+    # Wayland client + server libs (zonule/Smithay is the server; server-side no
+    # longer comes from wlroots since we dropped it).
     libwayland-client0 \
     libwayland-cursor0 \
     libwayland-egl1 \
+    libwayland-server0 \
     libdecor-0-0 \
-    # Compositor runtime: wlroots + its seat/input/render deps
-    libwlroots10 \
+    # Compositor runtime: zonule (Smithay) needs seat/input/xkb + DRM/GBM/EGL
+    # (Mesa libs are below). wlroots is gone — so libseat1 (the seatd *client*
+    # lib zonule links) must be pulled explicitly; the `seatd` package only ships
+    # the daemon, and dropping libwlroots10 removed the transitive libseat1.
+    libseat1 \
+    libxkbcommon0 \
     seatd \
     libinput10 \
     # cjsh links readline (pulls libtinfo/ncurses runtime)

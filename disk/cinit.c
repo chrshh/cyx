@@ -79,12 +79,21 @@ int main(void) {
   //   LIBGL_*     — Mesa: software-render first. Under QEMU `-M virt` there's
   //                 no host-GPU passthrough; on the real Pi 4 the VideoCore VI
   //                 (v3d/vc4) exists but we render via llvmpipe for bring-up.
+  //                 zonule's GlesRenderer renders through Mesa/EGL, so these
+  //                 LIBGL_/GALLIUM_ vars steer it onto llvmpipe.
   //                 >>> To enable the real Pi GPU later, drop LIBGL_ALWAYS_
-  //                 SOFTWARE / GALLIUM_DRIVER / WLR_RENDERER here. <<<
-  //   WLR_*       — force wlroots' pixman (software) renderer to match the
-  //                 above; drop alongside the LIBGL_ vars when moving to v3d
-  //   LIBSEAT_BACKEND is intentionally unset: seatd-launch sets SEATD_SOCK
-  //                 and libseat auto-selects the seatd backend.
+  //                 SOFTWARE / GALLIUM_DRIVER here. <<<
+  //   WLR_*       — LEGACY / no-ops now. The old compositor was wlroots-based;
+  //                 zonule is Smithay and ignores WLR_*. Harmless, kept only as
+  //                 a reminder; delete whenever. Software rendering is driven by
+  //                 the LIBGL_/GALLIUM_ vars above, not these.
+  //   LIBSEAT_BACKEND=builtin — run libseat's seat management IN-PROCESS (as
+  //                 root) instead of via a seatd daemon. With SEATD_VTBOUND=0
+  //                 (below) this is a single-seat, no-VT setup: zonule takes DRM
+  //                 master directly. No seatd, no seatd-launch, no seatd.sock.
+  //                 (The seatd *daemon* has no knob to become non-VT-bound in
+  //                 this version, which is why the daemon path couldn't get
+  //                 master on the serial console; the builtin backend does.)
   setenv("XDG_RUNTIME_DIR", "/run/user/0", 1);
   setenv("XDG_SESSION_TYPE", "wayland", 1);
   setenv("GDK_BACKEND", "wayland", 1);
@@ -96,6 +105,16 @@ int main(void) {
   setenv("GALLIUM_DRIVER", "llvmpipe", 1);
   setenv("WLR_RENDERER", "pixman", 1);
   setenv("WLR_NO_HARDWARE_CURSORS", "1", 1);
+  // The kernel has VT support (CONFIG_VT=y + fbcon), so libseat's builtin
+  // backend would try to bind to the active VT to arbitrate DRM master. But
+  // under QEMU `-M virt` we live on the serial console (ttyAMA0), never a
+  // graphical VT, so that VT would never activate and every modeset would fail
+  // with EPERM ("Unable to become drm master"). SEATD_VTBOUND=0 tells the
+  // builtin backend to skip VT binding: as the sole root session, zonule takes
+  // DRM master directly and fbcon (the boot-logo framebuffer console) hands the
+  // display over. Correct for a single-seat appliance with no VT switching.
+  setenv("LIBSEAT_BACKEND", "builtin", 1);
+  setenv("SEATD_VTBOUND", "0", 1);
   // WLR_LIBINPUT_NO_DEVICES intentionally dropped: with virtio-gpu-pci and
   // the virtio kernel input drivers we now have keyboards/mice in /dev/input
   // that libinput should pick up.
@@ -151,11 +170,11 @@ int main(void) {
   sigfillset(&set);
   sigprocmask(SIG_BLOCK, &set, NULL);
 
-  // tinywl's -s flag runs a startup command via /bin/sh -c. We launch
-  // squishy (our own Wayland-native terminal emulator), which in turn
-  // execs cjsh — see $SHELL set above, which squishy reads.
-  spawn((char *[]){"/usr/bin/seatd-launch", "--", "/bin/display",
-                   "-s", "/bin/squishy", NULL});
+  // Launch the compositor. zonule's -s flag runs a startup client once its
+  // wayland socket is up: squishy (our Wayland-native terminal emulator), which
+  // in turn execs cjsh — see $SHELL set above, which squishy reads. No
+  // seatd-launch: zonule uses libseat's builtin backend directly (see env above).
+  spawn((char *[]){"/bin/display", "-s", "/bin/squishy", NULL});
 
   while (1) {
     sigwait(&set, &sig);
@@ -180,13 +199,10 @@ static void sigpoweroff(void) {
  */
 static void sigreap(void) {
   while (waitpid(-1, NULL, WNOHANG) > 0);
-  // Stale socket left by a seatd that died without cleanup. Safe to unlink:
-  // /run is tmpfs and the only writer is seatd-launch, which always recreates.
-  unlink("/run/seatd.sock");
-  // Respawn the compositor + squishy (our terminal emulator). squishy
-  // execs $SHELL (=/bin/cjsh) inside the pty it opens.
-  spawn((char *[]){"/usr/bin/seatd-launch", "--", "/bin/display",
-                   "-s", "/bin/squishy", NULL});
+  // Respawn the compositor + squishy (our terminal emulator). squishy execs
+  // $SHELL (=/bin/cjsh) inside the pty it opens. zonule uses libseat's builtin
+  // backend (no seatd daemon), so there's no socket to clean up here.
+  spawn((char *[]){"/bin/display", "-s", "/bin/squishy", NULL});
 }
 
 static void sigreboot(void) {

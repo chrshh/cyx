@@ -1,0 +1,45 @@
+[package]
+name = "zonule"
+version = "0.1.0"
+edition = "2024"
+
+# zonule is cjyx's Wayland compositor. It starts from Smithay's `smallvil`
+# example (the window-management core: state, xdg-shell handlers, move/resize
+# grabs, input) but replaces smallvil's nested `winit` backend with a native
+# DRM/KMS + libinput + libseat backend so it runs as the real display server on
+# the cjyx guest (QEMU virtio-gpu) and on the Raspberry Pi 4 — the same role
+# tinywl filled before. Wayland only: no X11, no Xwayland, no winit.
+
+[dependencies]
+# fmt-only; no env-filter — we don't need runtime filter parsing.
+tracing-subscriber = "0.3.16"
+bitflags = "2.2.1"
+
+# Pinned to the exact smithay revision the smallvil sources were taken from, so
+# the vendored core compiles unchanged. Bump this rev deliberately (and re-check
+# the API) rather than tracking a moving branch.
+[dependencies.smithay]
+git = "https://github.com/Smithay/smithay"
+rev = "3021f619e2ae4dab8bfb1e21f3f210923b9b6582"
+default-features = false
+features = [
+    "desktop",
+    "wayland_frontend",
+    # Native backend: session (libseat) -> udev -> DRM/KMS -> GBM -> GLES,
+    # with libinput for input. This is the whole point of zonule vs smallvil.
+    "backend_session_libseat",
+    "backend_udev",
+    "backend_drm",
+    "backend_gbm",
+    "backend_libinput",
+    "backend_egl",
+    "use_system_lib",
+    "renderer_gl",
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

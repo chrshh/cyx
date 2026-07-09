@@ -9,6 +9,7 @@ DOCKER_IMAGE := cjyx-static
 # on the x86_64 host) — and set here rather than as a constant in the Dockerfile
 # FROM lines, which docker lints against.
 PLATFORM := linux/arm64
+ZONULE_SRC  := $(USERLAND)/display/zonule
 SQUISHY_SRC := $(USERLAND)/apps/squishy
 DINKY_SRC   := $(USERLAND)/apps/dinky
 CMDRS_SRC   := $(USERLAND)/cmd
@@ -113,10 +114,12 @@ $(BUILD)/cjsh: build-image | $(BUILD)
 	  docker cp $$cid:/cjyx/cjsh/cjsh $(BUILD)/cjsh; \
 	  docker rm $$cid >/dev/null
 
-$(BUILD)/display: build-image | $(BUILD)
-	cid=$$(docker create --platform $(PLATFORM) $(DOCKER_IMAGE)); \
-	  docker cp $$cid:/cjyx/display/display $(BUILD)/display; \
-	  docker rm $$cid >/dev/null
+# The compositor (zonule) is a Rust/Smithay program — it builds in its own
+# rust:1-bookworm toolchain image like squishy/dinky, NOT in the cjyx-static C
+# image. It's still installed into the rootfs as `bin/display` (cinit launches
+# `/bin/display`), so only this rule changes, not the disk staging.
+$(BUILD)/display: $(ZONULE_SRC)/build.py $(ZONULE_SRC)/Dockerfile.build $(ZONULE_SRC)/Cargo.toml $(ZONULE_SRC)/Cargo.lock $(shell find $(ZONULE_SRC)/src -name '*.rs') | $(BUILD)
+	python3 $(ZONULE_SRC)/build.py $(BUILD)/display
 
 # asemics is a Rust workspace member (see userland/Cargo.toml), so it's built
 # by the cmd-rs workspace build and installed into the image by the disk
@@ -146,14 +149,26 @@ $(BUILD)/dinky: $(DINKY_SRC)/build.py $(DINKY_SRC)/Dockerfile.build $(DINKY_SRC)
 $(BUILD)/.debian_rootfs: build-image | $(BUILD)
 	rm -rf $(BUILD)/debian-rootfs
 	mkdir -p $(BUILD)/debian-rootfs
-	cid=$$(docker create --platform $(PLATFORM) $(DOCKER_IMAGE)); \
-	  docker export $$cid | tar -x -C $(BUILD)/debian-rootfs \
-	    --exclude='cjyx' \
-	    --exclude='proc/*' \
-	    --exclude='sys/*' \
-	    --exclude='dev/*' \
-	    --exclude='.dockerenv' ; \
-	  docker rm $$cid >/dev/null
+	# Extract the WHOLE container filesystem, THEN prune. Excluding paths during
+	# `tar -x` of a `docker export` stream is fragile: docker emits hardlinks,
+	# and if an --exclude pattern drops the member that carries a hardlink's
+	# data, GNU tar aborts with "Cannot stat" (nondeterministic, by member
+	# order) and leaves a half-written, self-inconsistent merged-/usr tree —
+	# which then makes the disk Makefile's `cp -a` fail with "File exists".
+	# Extracting everything keeps every hardlink target present; we delete what
+	# we don't want afterwards. `set -o pipefail` so a real export/tar failure
+	# is not masked by the trailing `docker rm`.
+	set -o pipefail; \
+	  cid=$$(docker create --platform $(PLATFORM) $(DOCKER_IMAGE)); \
+	  docker export $$cid | tar -x -C $(BUILD)/debian-rootfs; \
+	  status=$$?; \
+	  docker rm $$cid >/dev/null; \
+	  exit $$status
+	rm -rf $(BUILD)/debian-rootfs/cjyx \
+	       $(BUILD)/debian-rootfs/.dockerenv \
+	       $(BUILD)/debian-rootfs/proc/* \
+	       $(BUILD)/debian-rootfs/sys/* \
+	       $(BUILD)/debian-rootfs/dev/*
 	touch $@
 
 cmd: build-image | $(BUILD)

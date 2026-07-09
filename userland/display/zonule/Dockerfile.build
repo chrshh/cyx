@@ -1,0 +1,28 @@
+# Toolchain image for building zonule (Rust Wayland compositor, Smithay).
+#
+# Uses rust:1-bookworm so the produced binary links against Debian bookworm's
+# glibc (2.36) — the same glibc baked into the cjyx guest's Debian userland.
+# Building on the Arch host would link against a newer glibc and fail to run
+# inside the guest.
+#
+# System deps are Smithay's native-backend build requirements: udev, DRM/GBM,
+# libinput, libseat (session), libxkbcommon, and the EGL/GL + wayland dev libs
+# used by `use_system_lib`/`backend_egl`. git is needed because smithay is a
+# pinned git dependency.
+FROM rust:1-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    pkg-config \
+    libudev-dev \
+    libgbm-dev \
+    libdrm-dev \
+    libinput-dev \
+    libseat-dev \
+    libxkbcommon-dev \
+    libwayland-dev \
+    libegl1-mesa-dev \
+    libgles2-mesa-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
