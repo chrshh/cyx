@@ -1,1 +1,1 @@
-### I'm making my own linux distro from scratch ig
+### I'm working on a linux distro
