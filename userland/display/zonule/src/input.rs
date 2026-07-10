@@ -1,33 +1,33 @@
+use std::process::Command;
+
 use smithay::{
     backend::input::{
         AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
-        KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent,
+        KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent,
     },
     input::{
-        keyboard::FilterResult,
+        keyboard::{FilterResult, Keysym, ModifiersState},
         pointer::{AxisFrame, ButtonEvent, MotionEvent},
     },
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::SERIAL_COUNTER,
+    wayland::{seat::WaylandFocus, shell::xdg::XdgShellHandler},
 };
+use tracing::{error, info};
 
-use crate::{state::Zonule, tty::schedule_render};
+use crate::{Zonule, tty::schedule_render};
 
 impl Zonule {
     pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
         match event {
+            // Keyboard events
             InputEvent::Keyboard { event, .. } => {
-                let serial = SERIAL_COUNTER.next_serial();
-                let time = Event::time_msec(&event);
-
-                self.seat.get_keyboard().unwrap().input::<(), _>(
-                    self,
-                    event.key_code(),
-                    event.state(),
-                    serial,
-                    time,
-                    |_, _, _| FilterResult::Forward,
-                );
+                let action = self.keyboard_key_to_action::<I>(event);
+                match action {
+                    KeyAction::None | KeyAction::Quit | KeyAction::Run(_) => {
+                        self.process_common_key_action(action)
+                    }
+                }
             }
             InputEvent::PointerMotion { .. } => {
                 schedule_render(self);
@@ -142,5 +142,86 @@ impl Zonule {
             }
             _ => {}
         }
+    }
+
+    fn keyboard_key_to_action<I: InputBackend>(&mut self, event: I::KeyboardKeyEvent) -> KeyAction {
+        let keycode = event.key_code();
+        let state = event.state();
+        let serial = SERIAL_COUNTER.next_serial();
+        let time = Event::time_msec(&event);
+        let keyboard = self.seat.get_keyboard().unwrap();
+
+        let action = keyboard.input(
+            self,
+            keycode,
+            state,
+            serial,
+            time,
+            |_, modifiers, handle| {
+                let keysym = handle.modified_sym();
+
+                if let KeyState::Pressed = state {
+                    let action = process_keyboard_shortcut(*modifiers, keysym);
+
+                    action
+                        .map(FilterResult::Intercept)
+                        .unwrap_or(FilterResult::Forward)
+                } else {
+                    FilterResult::Forward
+                }
+            },
+        );
+        action.unwrap_or(KeyAction::None)
+    }
+
+    fn process_common_key_action(&mut self, action: KeyAction) {
+        match action {
+            KeyAction::None => (),
+
+            KeyAction::Quit => {
+                if let Some(w) = self.focused_window() {
+                    // sends a close event, calls toplevel_destroyed() under the hood
+                    w.toplevel().unwrap().send_close();
+                }
+            }
+
+            KeyAction::Run(cmd) => {
+                info!(cmd, "Starting program");
+
+                if let Err(e) = Command::new(&cmd)
+                    .envs(
+                        self.socket_name
+                            .clone()
+                            .into_string()
+                            .map(|v| ("WAYLAND_DISPLAY", v))
+                            .into_iter()
+                            .chain(None),
+                    )
+                    .spawn()
+                {
+                    error!(cmd, err = %e, "Failed to start program");
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+enum KeyAction {
+    Run(String),
+    Quit,
+    None,
+}
+
+fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Option<KeyAction> {
+    // Launch terminal
+    if modifiers.ctrl && keysym == Keysym::Return {
+        println!("SUPER + ENTER --- LAUNCHING TERMINAL");
+        Some(KeyAction::Run("/bin/squishy".into()))
+    } else if modifiers.ctrl && keysym == Keysym::w {
+        println!("SUPER + W --- CLOSING WINDOW");
+        Some(KeyAction::Quit)
+    } else {
+        None
     }
 }

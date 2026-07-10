@@ -17,7 +17,6 @@ use smithay::{
     backend::{
         renderer::{
             damage::OutputDamageTracker,
-            element::memory::MemoryRenderBufferRenderElement, gles::GlesRenderer,
         },
         winit::{self, WinitEvent},
     },
@@ -105,16 +104,19 @@ fn init_winit(
                     let damage = Rectangle::from_size(size);
 
                     {
+                        let focused = state.focused_window();
                         let (renderer, mut framebuffer) = backend.bind().unwrap();
-                        let cursor_elements = crate::render::cursor_elements(
+                        let elements = crate::render::scene_elements(
                             renderer,
+                            &state.space,
+                            focused.as_ref(),
                             &state.cursor,
                             state.pointer.current_location(),
                             state.start_time.elapsed(),
                         );
                         smithay::desktop::space::render_output::<
                             _,
-                            MemoryRenderBufferRenderElement<GlesRenderer>,
+                            crate::render::ZonuleElement,
                             _,
                             _,
                         >(
@@ -124,7 +126,7 @@ fn init_winit(
                             1.0,
                             0,
                             [&state.space],
-                            &cursor_elements,
+                            &elements,
                             &mut damage_tracker,
                             [0.1, 0.1, 0.1, 1.0],
                         )

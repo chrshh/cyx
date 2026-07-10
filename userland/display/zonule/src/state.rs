@@ -175,11 +175,8 @@ impl Zonule {
     ) -> OsString {
         // Creates a new listening socket, automatically choosing the next available `wayland` socket name.
         let listening_socket = ListeningSocketSource::new_auto().unwrap();
-
         let socket_name = listening_socket.socket_name().to_os_string();
-
         let loop_handle = event_loop.handle();
-
         loop_handle
             .insert_source(listening_socket, move |client_stream, _, state| {
                 state
@@ -216,5 +213,67 @@ impl Zonule {
                     .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
                     .map(|(s, p)| (s, (p + location).to_f64()))
             })
+    }
+
+    pub fn arrange(&mut self) {
+        let Some(output) = self.space.outputs().next().cloned() else {
+            return;
+        };
+        let geo = self.space.output_geometry(&output).unwrap();
+
+        // Snapshot the windows: we can't hold the `elements()` borrow of `space`
+        // while calling `map_element`, which needs `&mut space`.
+        let windows: Vec<Window> = self.space.elements().cloned().collect();
+        let n = windows.len() as i32;
+        if n == 0 {
+            return;
+        }
+
+        // Usable area = the output inset by GAP on all sides (the outer margin);
+        // columns are then separated by GAP-wide gutters. The background shows
+        // through the gutters, and window borders (see render::border_elements)
+        // sit inside them.
+        let gap = crate::render::GAP;
+        let usable_x = geo.loc.x + gap;
+        let usable_y = geo.loc.y + gap;
+        let usable_w = geo.size.w - 2 * gap;
+        let usable_h = geo.size.h - 2 * gap;
+        // Each column gets an equal share of the width left after the (n-1)
+        // inter-column gaps.
+        let col_w = (usable_w - gap * (n - 1)) / n;
+
+        for (i, window) in windows.iter().enumerate() {
+            let i = i as i32;
+            // The last column absorbs the rounding remainder so the row fills the
+            // usable width exactly.
+            let w = if i == n - 1 {
+                usable_w - (col_w + gap) * (n - 1)
+            } else {
+                col_w
+            };
+            let loc = (usable_x + (col_w + gap) * i, usable_y);
+
+            // Size = configure the client (it redraws at this size on its next
+            // commit — a one-frame lag is normal). Position = place it now.
+            if let Some(toplevel) = window.toplevel() {
+                toplevel.with_pending_state(|state| {
+                    state.size = Some((w, usable_h).into());
+                });
+                toplevel.send_pending_configure();
+            }
+            self.space.map_element(window.clone(), loc, false);
+        }
+    }
+
+    pub fn focused_window(&self) -> Option<Window> {
+        let surface = self.seat.get_keyboard()?.current_focus()?;
+        self.space
+            .elements()
+            .find(|w| {
+                w.toplevel()
+                    .map(|t| t.wl_surface() == &surface)
+                    .unwrap_or(false)
+            })
+            .cloned()
     }
 }

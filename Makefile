@@ -218,10 +218,14 @@ run: image
 	$(QEMU_HEADLESS) -append "$(ROOT_CMDLINE) init=/init"
 run-shell-only: image
 	$(QEMU_HEADLESS) -append "$(ROOT_CMDLINE) init=/bin/cjsh"
+# SOFTRENDER=1 appends `cjyx.softrender`, which makes cinit skip the hardware
+# (virgl) renderer and force llvmpipe from boot. Default (unset) lets virgl try
+# first, with cinit falling back to software automatically if it fails.
+SOFT_CMDLINE := $(if $(SOFTRENDER), cjyx.softrender,)
 run-graphical: image
-	$(QEMU_GRAPHICAL) -append "$(ROOT_CMDLINE) init=/init"
+	$(QEMU_GRAPHICAL) -append "$(ROOT_CMDLINE)$(SOFT_CMDLINE) init=/init"
 run-graphical-shell-only: image
-	$(QEMU_GRAPHICAL) -append "$(ROOT_CMDLINE) init=/bin/cjsh"
+	$(QEMU_GRAPHICAL) -append "$(ROOT_CMDLINE)$(SOFT_CMDLINE) init=/bin/cjsh"
 
 run-g:  run-graphical
 run-gs: run-graphical-shell-only

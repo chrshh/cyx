@@ -34,9 +34,24 @@ impl XdgShellHandler for Zonule {
     }
 
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
-        surface.send_configure();
         let window = Window::new_wayland_window(surface);
         self.space.map_element(window, (0, 0), false);
+        self.arrange();
+    }
+
+    fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
+        let w = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().map(|t| t == &surface).unwrap_or(false))
+            .cloned();
+
+        if let Some(w) = w {
+            self.space.unmap_elem(&w);
+        }
+
+        self.space.refresh();
+        self.arrange();
     }
 
     fn new_popup(&mut self, surface: PopupSurface, _positioner: PositionerState) {

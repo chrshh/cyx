@@ -4,7 +4,6 @@ mod cursor;
 mod grabs;
 mod handlers;
 mod input;
-mod keyboard;
 mod render;
 mod state;
 mod tty;

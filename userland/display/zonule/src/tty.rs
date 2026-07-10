@@ -27,7 +27,7 @@ use smithay::{
         libinput::{LibinputInputBackend, LibinputSessionInterface},
         renderer::{
             Bind, damage::OutputDamageTracker,
-            element::memory::MemoryRenderBufferRenderElement, gles::GlesRenderer,
+            gles::GlesRenderer,
         },
         session::{Event as SessionEvent, Session, libseat::LibSeatSession},
         udev::{all_gpus, primary_gpu},
@@ -291,11 +291,15 @@ pub fn schedule_render(state: &mut Zonule) {
             backend.render_queued = false;
         }
         if state.backend.is_some() {
+            // Compute focus first (borrows all of `state`) so it's an owned value
+            // by the time we take the disjoint field borrows below.
+            let focused = state.focused_window();
             render_surface(
                 &state.space,
                 state.start_time,
                 &state.cursor,
                 state.pointer.current_location(),
+                focused,
                 state.backend.as_mut().unwrap(),
             );
         }
@@ -310,6 +314,7 @@ fn render_surface(
     start_time: Instant,
     cursor: &Cursor,
     pointer_loc: Point<f64, Logical>,
+    focused: Option<Window>,
     backend: &mut Backend,
 ) {
     if backend.waiting_for_vblank || !backend.drm.is_active() {
@@ -332,8 +337,10 @@ fn render_surface(
         }
     };
 
-    let cursor_elements = crate::render::cursor_elements(
+    let elements = crate::render::scene_elements(
         &mut backend.renderer,
+        space,
+        focused.as_ref(),
         cursor,
         pointer_loc,
         start_time.elapsed(),
@@ -341,7 +348,7 @@ fn render_surface(
 
     let render_result = smithay::desktop::space::render_output::<
         _,
-        MemoryRenderBufferRenderElement<GlesRenderer>,
+        crate::render::ZonuleElement,
         _,
         _,
     >(
@@ -351,7 +358,7 @@ fn render_surface(
         1.0,
         age as usize,
         [space],
-        &cursor_elements,
+        &elements,
         &mut backend.damage_tracker,
         CLEAR_COLOR,
     );
