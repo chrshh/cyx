@@ -158,6 +158,13 @@ name = "cg"
 version = "0.1.0"
 
 [[package]]
+name = "clear"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "compact_str"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
