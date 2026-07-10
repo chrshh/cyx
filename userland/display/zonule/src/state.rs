@@ -1,8 +1,11 @@
-use std::{ffi::OsString, sync::Arc};
+use std::{ffi::OsString, sync::Arc, time::Duration};
 
 use smithay::{
     desktop::{PopupManager, Space, Window, WindowSurfaceType},
-    input::{Seat, SeatState},
+    input::{
+        Seat, SeatState,
+        pointer::{CursorImageStatus, PointerHandle},
+    },
     reexports::{
         calloop::{EventLoop, Interest, LoopSignal, Mode, PostAction, generic::Generic},
         wayland_server::{
@@ -15,6 +18,8 @@ use smithay::{
     wayland::{
         compositor::{CompositorClientState, CompositorState},
         output::OutputManagerState,
+        pointer_constraints::{PointerConstraintsHandler, with_pointer_constraint},
+        seat::WaylandFocus,
         selection::data_device::DataDeviceState,
         shell::xdg::XdgShellState,
         shm::ShmState,
@@ -22,13 +27,30 @@ use smithay::{
     },
 };
 
+use crate::cursor::Cursor;
+
+/// Data associated with a wayland client that connects to Zonule.
+/// One instance of this type per client.
+#[derive(Default)]
+pub struct ClientState {
+    pub compositor_state: CompositorClientState,
+}
+
+impl ClientData for ClientState {
+    fn initialized(&self, _client_id: ClientId) {}
+    fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {}
+}
+
+// #[derive(Debug)]
 pub struct Zonule {
+    pub backend: Option<crate::tty::Backend>,
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
     pub display_handle: DisplayHandle,
 
+    // desktop
     pub space: Space<Window>,
-    pub loop_signal: LoopSignal,
+    pub popups: PopupManager,
 
     // Smithay State
     pub compositor_state: CompositorState,
@@ -37,24 +59,67 @@ pub struct Zonule {
     pub output_manager_state: OutputManagerState,
     pub seat_state: SeatState<Zonule>,
     pub data_device_state: DataDeviceState,
-    pub popups: PopupManager,
+    pub loop_signal: LoopSignal,
 
+    // input fields
     pub seat: Seat<Self>,
+    pub cursor: Cursor,
+    pub cursor_status: CursorImageStatus,
+    pub pointer: PointerHandle<Zonule>,
+    pub cursor_position_hint: Option<(WlSurface, Point<f64, Logical>)>,
+}
 
-    /// Native DRM/KMS backend state. `None` until `tty::run` builds and installs
-    /// it after the compositor state exists (it needs `display_handle`/`space`).
-    pub backend: Option<crate::tty::Backend>,
+impl PointerConstraintsHandler for Zonule {
+    fn new_constraint(&mut self, surface: &WlSurface, pointer: &PointerHandle<Self>) {
+        // Set restricted region for mouse
+        let Some(curr_focus) = pointer.current_focus() else {
+            return;
+        };
+        if curr_focus.wl_surface().as_deref() == Some(surface) {
+            with_pointer_constraint(surface, pointer, |constraint| {
+                constraint.unwrap().activate();
+            });
+        }
+    }
+
+    fn remove_constraint(&mut self, surface: &WlSurface, pointer: &PointerHandle<Self>) {
+        if with_pointer_constraint(surface, pointer, |constraint| constraint.is_none()) {
+            if let Some((hint_surface, hint_location)) = &self.cursor_position_hint {
+                let origin = self
+                    .space
+                    .elements()
+                    .find_map(|window| {
+                        (window.wl_surface().as_deref() == Some(hint_surface))
+                            .then(|| window.geometry())
+                    })
+                    .unwrap_or_default()
+                    .loc
+                    .to_f64();
+
+                pointer.set_location(origin + *hint_location);
+            }
+            self.cursor_position_hint = None;
+        }
+    }
+
+    fn cursor_position_hint(
+        &mut self,
+        surface: &WlSurface,
+        pointer: &PointerHandle<Self>,
+        location: Point<f64, Logical>,
+    ) {
+        if with_pointer_constraint(surface, pointer, |constraint| {
+            constraint.is_some_and(|c| c.is_active())
+        }) {
+            self.cursor_position_hint = Some((surface.clone(), location));
+        }
+    }
 }
 
 impl Zonule {
     pub fn new(event_loop: &mut EventLoop<Self>, display: Display<Self>) -> Self {
-        let start_time = std::time::Instant::now();
-
         let dh = display.handle();
-
-        // Here we initialize implementations of some wayland protocols
-        // Some of them require us to implement traits on the Zonule state,
-        // you can find those implementations in the `crate::handlers` module
+        let start_time = std::time::Instant::now();
 
         // Initialize protocols needed for displaying windows
         let compositor_state = CompositorState::new::<Self>(&dh);
@@ -63,42 +128,30 @@ impl Zonule {
         let popups = PopupManager::default();
 
         let output_manager_state = OutputManagerState::new_with_xdg_output::<Self>(&dh);
-
-        // Data device is responsible for clipboard and drag-and-drop
         let data_device_state = DataDeviceState::new::<Self>(&dh);
 
-        // A seat is a group of keyboards, pointer and touch devices.
-        // A seat typically has a pointer and maintains a keyboard focus and a pointer focus.
+        // init input
         let mut seat_state = SeatState::new();
         let mut seat: Seat<Self> = seat_state.new_wl_seat(&dh, "winit");
 
-        // Notify clients that we have a keyboard, for the sake of the example we assume that keyboard is always present.
-        // You may want to track keyboard hot-plug in real compositor.
+        let cursor = Cursor::load();
+        let image = cursor.get_image(1, Duration::ZERO);
+        let pointer = seat.add_pointer();
+
         seat.add_keyboard(Default::default(), 200, 25).unwrap();
 
-        // Notify clients that we have a pointer (mouse)
-        // Here we assume that there is always pointer plugged in
-        seat.add_pointer();
-
-        // A space represents a two-dimensional plane. Windows and Outputs can be mapped onto it.
-        //
-        // Windows get a position and stacking order through mapping.
-        // Outputs become views of a part of the Space and can be rendered via Space::render_output.
         let space = Space::default();
-
-        // Setup a wayland socket that will be used to accept clients
         let socket_name = Self::init_wayland_listener(display, event_loop);
-
-        // Get the loop signal, used to stop the event loop
         let loop_signal = event_loop.get_signal();
 
         Self {
+            backend: None,
             start_time,
+            socket_name,
             display_handle: dh,
 
             space,
-            loop_signal,
-            socket_name,
+            popups,
 
             compositor_state,
             xdg_shell_state,
@@ -106,9 +159,13 @@ impl Zonule {
             output_manager_state,
             seat_state,
             data_device_state,
-            popups,
+            loop_signal,
+
             seat,
-            backend: None,
+            cursor,
+            cursor_status: CursorImageStatus::default_named(),
+            pointer,
+            cursor_position_hint: None,
         }
     }
 
@@ -119,17 +176,12 @@ impl Zonule {
         // Creates a new listening socket, automatically choosing the next available `wayland` socket name.
         let listening_socket = ListeningSocketSource::new_auto().unwrap();
 
-        // Get the name of the listening socket.
-        // Clients will connect to this socket.
         let socket_name = listening_socket.socket_name().to_os_string();
 
         let loop_handle = event_loop.handle();
 
         loop_handle
             .insert_source(listening_socket, move |client_stream, _, state| {
-                // Inside the callback, you should insert the client into the display.
-                //
-                // You may also associate some data with the client when inserting the client.
                 state
                     .display_handle
                     .insert_client(client_stream, Arc::new(ClientState::default()))
@@ -137,7 +189,6 @@ impl Zonule {
             })
             .expect("Failed to init the wayland event source.");
 
-        // You also need to add the display itself to the event loop, so that client events will be processed by wayland-server.
         loop_handle
             .insert_source(
                 Generic::new(display, Interest::READ, Mode::Level),
@@ -166,16 +217,4 @@ impl Zonule {
                     .map(|(s, p)| (s, (p + location).to_f64()))
             })
     }
-}
-
-/// Data associated with a wayland client that connects to Zonule.
-/// One instance of this type per client.
-#[derive(Default)]
-pub struct ClientState {
-    pub compositor_state: CompositorClientState,
-}
-
-impl ClientData for ClientState {
-    fn initialized(&self, _client_id: ClientId) {}
-    fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {}
 }

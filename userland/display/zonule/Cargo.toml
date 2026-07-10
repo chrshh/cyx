@@ -14,6 +14,9 @@ edition = "2024"
 # fmt-only; no env-filter — we don't need runtime filter parsing.
 tracing-subscriber = "0.3.16"
 bitflags = "2.2.1"
+xcursor = "0.3.10"
+thiserror = "2.0.18"
+tracing = "0.1.44"
 
 # Pinned to the exact smithay revision the smallvil sources were taken from, so
 # the vendored core compiles unchanged. Bump this rev deliberately (and re-check
@@ -37,9 +40,36 @@ features = [
     "renderer_gl",
 ]
 
+[features]
+# Nested "run it like a normal app" dev backend. OFF by default, so the shipped
+# arm64 image never pulls winit or its deps. Enable it on your desktop with
+# `cargo run --features dev` to open zonule as a WINDOW inside your existing
+# Wayland/X11 session and iterate on window management without booting the OS.
+dev = ["smithay/backend_winit"]
+
+# Shipped binary (make display / make run-g): small + fast at runtime, but slow
+# to build — fat LTO re-optimizes the whole smithay dep graph on every link and
+# codegen-units=1 is single-threaded. Use this for the real image.
 [profile.release]
 opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
 panic = "abort"
+
+# Fast iteration profile (build.py --dev / make run-g ZONULE_DEV=1). The point:
+# NO lto, so changing zonule never re-optimizes the vendored crates — they
+# compile once into target/debug and are reused, and only zonule + a plain link
+# are redone. codegen-units defaults high (parallel) and zonule is unoptimized
+# for the fastest possible recompile.
+[profile.dev]
+opt-level = 0
+# line tables only: real backtraces on panic without hauling full debuginfo into
+# the guest image.
+debug = "line-tables-only"
+
+# ...but optimize the dependencies (smithay & co.) at -O2. They're built exactly
+# once and cached, so this costs nothing after the first dev build and keeps the
+# compositor's runtime smooth even in dev mode.
+[profile.dev.package."*"]
+opt-level = 2

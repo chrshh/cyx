@@ -1,4 +1,4 @@
-.PHONY: all clean clean-data clean-all init kernel kernel-config cjsh display cmd cmd-rs squishy dinky build-image image sd-card run run-shell-only run-graphical run-graphical-shell-only run-g run-gs
+.PHONY: all clean clean-data clean-all init kernel kernel-config cjsh display cmd cmd-rs squishy dinky build-image image sd-card run run-shell-only run-graphical run-graphical-shell-only run-g run-gs run-g-dev run-gs-dev
 ROOT      := $(CURDIR)
 BUILD     := $(ROOT)/build
 USERLAND  := $(ROOT)/userland
@@ -118,8 +118,13 @@ $(BUILD)/cjsh: build-image | $(BUILD)
 # rust:1-bookworm toolchain image like squishy/dinky, NOT in the cjyx-static C
 # image. It's still installed into the rootfs as `bin/display` (cinit launches
 # `/bin/display`), so only this rule changes, not the disk staging.
+# Set ZONULE_DEV=1 to build the fast no-LTO iteration profile (see zonule's
+# Cargo.toml). `make run-g-dev` is a shortcut. NOTE: the built binary lives at
+# one path ($(BUILD)/display) regardless of profile, so the mode "sticks" to
+# whatever last built it — touch a src file (you will anyway) or `rm
+# $(BUILD)/display` to force a switch between dev and release.
 $(BUILD)/display: $(ZONULE_SRC)/build.py $(ZONULE_SRC)/Dockerfile.build $(ZONULE_SRC)/Cargo.toml $(ZONULE_SRC)/Cargo.lock $(shell find $(ZONULE_SRC)/src -name '*.rs') | $(BUILD)
-	python3 $(ZONULE_SRC)/build.py $(BUILD)/display
+	python3 $(ZONULE_SRC)/build.py $(if $(ZONULE_DEV),--dev,) $(BUILD)/display
 
 # asemics is a Rust workspace member (see userland/Cargo.toml), so it's built
 # by the cmd-rs workspace build and installed into the image by the disk
@@ -146,7 +151,18 @@ $(BUILD)/dinky: $(DINKY_SRC)/build.py $(DINKY_SRC)/Dockerfile.build $(DINKY_SRC)
 # We exclude /cjyx (we ship our own builds via dedicated targets) and the
 # kernel-mounted virtual filesystems (/proc /sys /dev mountpoints get
 # created fresh in the rootfs and mounted at runtime).
-$(BUILD)/.debian_rootfs: build-image | $(BUILD)
+#
+# This export (docker export | tar -x of the whole fs) plus the disk
+# Makefile's `cp -a` of it is multi-minute work, and it used to run on EVERY
+# `make run-g` because it depended on the phony `build-image` (always "newer").
+# But the rootfs contents are determined solely by the Dockerfile's package
+# set — our own binaries are pruned out (`rm -rf .../cjyx`), so a zonule/C
+# source change doesn't alter the base at all. So we now key the re-export on
+# the Dockerfile (a real file): it only re-runs when you actually change what's
+# installed. `build-image` stays as an order-only prereq — it still runs (cheap
+# when the docker layer cache is warm) to guarantee the image exists before we
+# export, but per Make's order-only rule it no longer forces a re-export.
+$(BUILD)/.debian_rootfs: $(USERLAND)/Dockerfile | build-image $(BUILD)
 	rm -rf $(BUILD)/debian-rootfs
 	mkdir -p $(BUILD)/debian-rootfs
 	# Extract the WHOLE container filesystem, THEN prune. Excluding paths during
@@ -209,6 +225,13 @@ run-graphical-shell-only: image
 
 run-g:  run-graphical
 run-gs: run-graphical-shell-only
+
+# Fast-iteration variants: same as run-g/run-gs but zonule builds with the
+# no-LTO dev profile, so the compositor recompiles in a fraction of the time.
+run-g-dev:
+	$(MAKE) run-graphical ZONULE_DEV=1
+run-gs-dev:
+	$(MAKE) run-graphical-shell-only ZONULE_DEV=1
 
 clean:
 	$(MAKE) -C $(USERLAND) clean

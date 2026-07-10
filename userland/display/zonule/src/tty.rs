@@ -26,8 +26,8 @@ use smithay::{
         egl::{EGLContext, EGLDisplay},
         libinput::{LibinputInputBackend, LibinputSessionInterface},
         renderer::{
-            Bind, damage::OutputDamageTracker, element::surface::WaylandSurfaceRenderElement,
-            gles::GlesRenderer,
+            Bind, damage::OutputDamageTracker,
+            element::memory::MemoryRenderBufferRenderElement, gles::GlesRenderer,
         },
         session::{Event as SessionEvent, Session, libseat::LibSeatSession},
         udev::{all_gpus, primary_gpu},
@@ -41,10 +41,10 @@ use smithay::{
         rustix::fs::OFlags,
         wayland_server::Display,
     },
-    utils::{DeviceFd, Transform},
+    utils::{DeviceFd, Logical, Point, Transform},
 };
 
-use crate::Zonule;
+use crate::{Zonule, cursor::Cursor};
 
 const CLEAR_COLOR: [f32; 4] = [0.1, 0.1, 0.1, 1.0];
 
@@ -59,11 +59,7 @@ pub struct Backend {
     damage_tracker: OutputDamageTracker,
     output: Output,
     loop_handle: LoopHandle<'static, Zonule>,
-    /// True between queueing a frame and its vblank; suppresses re-rendering so
-    /// we don't stack buffers on the swapchain.
     waiting_for_vblank: bool,
-    /// True while a render is already queued on the event loop's idle slot, so
-    /// commit/vblank wake-ups don't schedule duplicate renders.
     render_queued: bool,
 }
 
@@ -254,7 +250,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 /// our compositor via `WAYLAND_DISPLAY`. This is how the shell/terminal comes up
 /// under zonule (cinit passes `-s /bin/squishy`). If no `-s` is given, nothing
 /// is launched — zonule just waits for clients on its socket.
-fn spawn_startup(socket_name: std::ffi::OsString) {
+pub fn spawn_startup(socket_name: std::ffi::OsString) {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         if arg == "-s" {
@@ -298,6 +294,8 @@ pub fn schedule_render(state: &mut Zonule) {
             render_surface(
                 &state.space,
                 state.start_time,
+                &state.cursor,
+                state.pointer.current_location(),
                 state.backend.as_mut().unwrap(),
             );
         }
@@ -307,7 +305,13 @@ pub fn schedule_render(state: &mut Zonule) {
 /// Render one frame of `space` onto the backend's output, queueing it for
 /// scanout if anything changed. Takes disjoint borrows of `Zonule`'s fields so
 /// the borrow checker is happy.
-fn render_surface(space: &Space<Window>, start_time: Instant, backend: &mut Backend) {
+fn render_surface(
+    space: &Space<Window>,
+    start_time: Instant,
+    cursor: &Cursor,
+    pointer_loc: Point<f64, Logical>,
+    backend: &mut Backend,
+) {
     if backend.waiting_for_vblank || !backend.drm.is_active() {
         return;
     }
@@ -328,9 +332,16 @@ fn render_surface(space: &Space<Window>, start_time: Instant, backend: &mut Back
         }
     };
 
+    let cursor_elements = crate::render::cursor_elements(
+        &mut backend.renderer,
+        cursor,
+        pointer_loc,
+        start_time.elapsed(),
+    );
+
     let render_result = smithay::desktop::space::render_output::<
         _,
-        WaylandSurfaceRenderElement<GlesRenderer>,
+        MemoryRenderBufferRenderElement<GlesRenderer>,
         _,
         _,
     >(
@@ -340,7 +351,7 @@ fn render_surface(space: &Space<Window>, start_time: Instant, backend: &mut Back
         1.0,
         age as usize,
         [space],
-        &[],
+        &cursor_elements,
         &mut backend.damage_tracker,
         CLEAR_COLOR,
     );
